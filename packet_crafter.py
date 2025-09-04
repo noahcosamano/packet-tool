@@ -11,7 +11,8 @@ Author: Noah Cosamano
 """
 
 from scapy.all import TCP,sr1,sr,srp1,srp,send,sendp,IP,UDP,Ether,ICMP
-import ipaddress, re, sqlite3
+import ipaddress, re, sqlite3, hashlib
+from datetime import datetime
 
 class Packet:
     __slots__ = ["dst_ip","dst_mac","protocol","dst_port","flags","src_port","src_ip"]
@@ -118,23 +119,27 @@ class Packet:
     def s_packet(self): # Sends one packet
         pkt = self.create_packet()
         
+        log_packet(self,None,True)
+        
         if self.dst_mac is None: # Send is a layer 3 function while sendp is a layer 2 function, so if MAC is provided, it uses sendp
-            send(pkt,verbose=1)
+            send(pkt,verbose=0)
         else:
-            sendp(pkt,verbose=1)
+            sendp(pkt,verbose=0)
             
     def sr_packet(self): # Sends and receives one packet (same as above, except for srp1 and sr1)
         pkt = self.create_packet()
         
         if self.dst_mac:
-            response = srp1(pkt,timeout=1,verbose=1)
+            response = srp1(pkt,timeout=1,verbose=0)
         else:
-            response = sr1(pkt,timeout=1,verbose=1)
+            response = sr1(pkt,timeout=1,verbose=0)
             
         if response: # If packet received a response, this will print it
             print(f"Received: {response.summary()}")
         else:
             print("No response")
+            
+        log_packet(self,response_summary=response.summary() if response else "No response",anonymize=True)
             
         return response
     
@@ -142,15 +147,63 @@ class Packet:
         return(f"Destination IPv4: {self.dst_ip}\nProtocol: {self.protocol.upper()}\nDestination port: {self.dst_port}\n"
               + f"Flags: {self.flags}\nDestination MAC address: {self.dst_mac}\nSource port: {self.src_port}\n"
               + f"Source IPv4: {self.src_ip}")
+        
+def hash_data(data:str) -> str:
+    return hashlib.sha256(data.encode()).hexdigest()
+    
+def log_packet(packet:Packet,response_summary:str|None=None,anonymize=True):
+    conn = sqlite3.connect("packet_history.sqlite")
+    c = conn.cursor()
+    
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS packet_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            dst_ip TEXT,
+            src_ip TEXT,
+            dst_mac TEXT,
+            protocol TEXT,
+            dst_port INTEGER,
+            src_port INTEGER,
+            flags TEXT,
+            response TEXT
+        )
+    """)
+    
+    dst_ip = hash_data(packet.dst_ip) if (packet.dst_ip and anonymize) else packet.dst_ip
+    src_ip = hash_data(packet.src_ip) if (packet.src_ip and anonymize) else packet.src_ip
+    dst_mac = hash_data(packet.dst_mac) if (packet.dst_mac and anonymize) else packet.dst_mac
+    
+    c.execute("""
+        INSERT INTO packet_history (
+            timestamp, dst_ip, src_ip, dst_mac,
+            protocol, dst_port, src_port, flags, response
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+    """, (
+        datetime.now().isoformat(),
+        dst_ip,
+        src_ip,
+        dst_mac,
+        packet.protocol,
+        packet.dst_port,
+        packet.src_port,
+        ','.join(packet.flags) if packet.flags else None,
+        response_summary
+    ))
+    
+    conn.commit()
+    conn.close()
     
 def main():
-    pkt1 = Packet("192.168.1.1","TCP",12089,"SAP","ff:ff:ff:ff:ff",1,"192.168.1.2")
-    print(pkt1)
+    pkt1 = Packet("129.21.72.179","TCP",80,"S",None,90,None)
     pkt1.s_packet()
+    
+    pkt2 = Packet("129.21.72.179","TCP",80,"S",None,445,None)
+    pkt2.sr_packet()
+    
+    pkt3 = Packet("129.21.72.179","ICMP",None,None,None,None,None)
+    pkt3.s_packet()
     
 if __name__ == "__main__":
     main()
-        
-        
-            
-        
