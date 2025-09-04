@@ -12,16 +12,17 @@ addresses, MAC addresses, and payloads.
 Author: Noah Cosamano
 """
 
-from scapy.all import TCP, sr1, srp1, send, sendp, IP, UDP, Ether, ICMP, Raw
-import ipaddress, re, sqlite3, hashlib
+from scapy.all import TCP, sr1, srp1, send, sendp, IP, UDP, Ether, ICMP, Raw, ARP
+import ipaddress, re, sqlite3, hashlib, nmap
 from datetime import datetime
 
 class Packet:
-    __slots__ = ["dst_ip", "dst_mac", "protocol", "dst_port", "flags", "src_port", "src_ip", "src_mac", "payload", "num_pkts"]
+    __slots__ = ["dst_ip", "dst_mac", "protocol", "dst_port", "flags", "src_port", "src_ip", "src_mac", "payload", 
+                 "num_pkts", "arp_op"]
     
     def __init__(self, dst_ip:str, protocol:str, dst_port:int|None = None, flags:str|list|None = None,
                  dst_mac:str|None = None, src_port:int|None = None, src_ip:str|None = None, src_mac:str|None = None,
-                 payload:str|None = None, num_pkts:int = 1):
+                 payload:str|None = None, num_pkts:int = 1, arp_op:int|None = 1):
         
         protocol = protocol.lower() # Sets protocol to lower case to verify
         
@@ -65,6 +66,11 @@ class Packet:
         else:
             self.src_ip = src_ip # Sets to None if user does not input. This is for if you print packet information.
             
+        if src_port:
+            if not isinstance(src_port, int) or not (1 <= src_port <= 65535):
+                raise ValueError("Invalid port")
+        self.src_port = src_port # Sets to None if user does not input. This is for if you print packet information.
+            
         if payload:
             if isinstance(payload, str):
                 self.payload = payload
@@ -77,6 +83,16 @@ class Packet:
             self.num_pkts = num_pkts
         else:
             raise ValueError("Invalid number of packets")
+        
+        if arp_op == 1:
+            self.arp_op = arp_op
+            self.dst_mac = "ff:ff:ff:ff:ff:ff"
+        elif arp_op == 2:
+            self.arp_op = arp_op
+            if self.dst_mac is None:
+                raise ValueError("ARP replies require destination MAC")
+        else:
+            raise ValueError("Invalid ARP operator")
 
         if protocol in ("tcp", "udp"):
             self.protocol = protocol
@@ -93,28 +109,35 @@ class Packet:
                 raise ValueError("ICMP does not support flags")
             if dst_port is not None or src_port is not None:
                 raise ValueError("ICMP does not support ports")
-            self.dst_port = dst_port # Sets to None if user does not input. This is for if you print packet information.
-            self.src_port = src_port # Sets to None if user does not input. This is for if you print packet information.
+            self.dst_port = dst_port; self.src_port = src_port # Sets to None if user does not input. This is for if you print packet information.
+            
+        elif protocol == "arp":
+            self.protocol = protocol
+            if flags:
+                raise ValueError("ARP does not support flags")
+            if dst_port is not None or src_port is not None:
+                raise ValueError("ARP does not support ports")
+            if payload is not None:
+                raise ValueError("ARP does not support payloads")
+            self.dst_port = dst_port; self.src_port = src_port # Sets to None if user does not input. This is for if you print packet information.
+            if src_ip is None or src_mac is None or dst_ip is None:
+                raise ValueError("ARP requires source IP, MAC, and destination IP")
             
         else:
             raise ValueError("Invalid protocol")
-        
-        if src_port:
-            if not isinstance(src_port, int) or not (1 <= src_port <= 65535):
-                raise ValueError("Invalid port")
-        self.src_port = src_port # Sets to None if user does not input. This is for if you print packet information.
             
     def create_packet(self):
-        ip = IP(dst = self.dst_ip) # Sets destination IPv4 for IP layer
+        if self.protocol != "arp":
+            ip = IP(dst = self.dst_ip) # Sets destination IPv4 for IP layer
+            if self.src_ip:
+                ip.src = self.src_ip
+                
         ether = Ether() # Creates ethernet layer for link layer
         
         if self.payload:
             payload = Raw(load = self.payload.encode())
         else:
             payload = None
-        
-        if self.src_ip:
-            ip.src = self.src_ip
         
         if self.protocol == "tcp":
             tcp = TCP(dport = self.dst_port)
@@ -135,10 +158,21 @@ class Packet:
         elif self.protocol == "icmp":
             layer4 = ICMP()
             
+        elif self.protocol == "arp":
+            layer4 = ARP(op = self.arp_op, hwsrc = self.src_mac, psrc = self.src_ip, pdst = self.dst_ip)
+            if self.dst_mac is not None:
+                ether.dst = self.dst_mac
+                layer4.hwdst = self.dst_mac
+            
         else: # Currently this program supports TCP, UDP, and ICMP
             raise ValueError("Unsupported protocol")
         
-        pkt = ip / layer4
+        if self.protocol == "arp":
+            pkt = ether / layer4
+        else:
+            pkt = ip / layer4
+            if self.dst_mac or self.src_mac:
+                pkt = ether / pkt
         
         if self.dst_mac or self.src_mac:
             if self.dst_mac: ether.dst = self.dst_mac
@@ -156,9 +190,9 @@ class Packet:
         
         while index <= self.num_pkts:
             if self.dst_mac or self.src_mac: # Send is a layer 3 function while sendp is a layer 2 function, so if MAC is provided, it uses sendp
-                sendp(pkt, verbose=0)
+                sendp(pkt, verbose = 0)
             else:
-                send(pkt, verbose=0)
+                send(pkt, verbose = 0)
                 
             log_packet(self, None, True)
             index += 1
@@ -169,9 +203,9 @@ class Packet:
         
         while index <= self.num_pkts:
             if self.dst_mac or self.src_mac:
-                response = srp1(pkt, timeout=3, verbose=0)
+                response = srp1(pkt, timeout = 3, verbose=0)
             else:
-                response = sr1(pkt, timeout=3, verbose=0)
+                response = sr1(pkt, timeout = 3, verbose = 0)
                 
             if response: # If packet received a response, this will print it
                 print(f"Received: {response.summary()}")
@@ -208,6 +242,7 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
             src_port INTEGER,
             flags TEXT,
             payload TEXT,
+            arp_op INTEGER,
             response TEXT
         )
     """)
@@ -222,8 +257,8 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
     c.execute("""
         INSERT INTO packet_history (
             timestamp, dst_ip, src_ip, dst_mac, src_mac, protocol, 
-            dst_port, src_port, flags, payload, response
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            dst_port, src_port, flags, payload, arp_op, response
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
     """, (
         datetime.now().isoformat(), # Logs date and time of packet
@@ -236,6 +271,7 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
         packet.src_port,
         ','.join(packet.flags) if packet.flags else None,
         payload,
+        packet.arp_op,
         response_summary
     ))
     
@@ -243,8 +279,9 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
     conn.close()
     
 def main():
-    pkt3 = Packet("129.21.72.179", "TCP", 12, None, None, 6, None, None, "heheheha", 10)
-    pkt3.s_packet()
+    
+    pkt1 = Packet("129.21.72.179","ARP",None,None,"ff:fe:08:87:90:73",None,"129.21.108.139","60:45:2e:c8:6f:09")
+    pkt1.sr_packet()
     
 if __name__ == "__main__":
     main()
