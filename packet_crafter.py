@@ -17,20 +17,27 @@ import ipaddress, re, sqlite3, hashlib
 from datetime import datetime
 
 class Packet:
-    __slots__ = ["dst_ip", "dst_mac", "protocol", "dst_port", "flags", "src_port", "src_ip", "payload", "num_pkts"]
+    __slots__ = ["dst_ip", "dst_mac", "protocol", "dst_port", "flags", "src_port", "src_ip", "src_mac", "payload", "num_pkts"]
     
     def __init__(self, dst_ip:str, protocol:str, dst_port:int|None = None, flags:str|list|None = None,
-                 dst_mac:str|None = None, src_port:int|None = None, src_ip:str|None = None, payload:str|None = None,
-                 num_pkts:int = 1):
+                 dst_mac:str|None = None, src_port:int|None = None, src_ip:str|None = None, src_mac:str|None = None,
+                 payload:str|None = None, num_pkts:int = 1):
         
         protocol = protocol.lower() # Sets protocol to lower case to verify
         
         if dst_mac:
             if not re.match(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', dst_mac): # Ensures MAC address is valid format
-                raise ValueError("Invalid MAC address")
+                raise ValueError("Invalid destination MAC address")
             self.dst_mac = dst_mac
         else:
             self.dst_mac = dst_mac # Sets to None if user does not input. This is for if you print packet information.
+            
+        if src_mac:
+            if not re.match(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', src_mac): # Ensures MAC address is valid format
+                raise ValueError("Invalid source MAC address")
+            self.src_mac = src_mac
+        else:
+            self.src_mac = src_mac # Sets to None if user does not input. This is for if you print packet information.
         
         if flags:
             for flag in flags:
@@ -64,7 +71,7 @@ class Packet:
             else:
                 raise ValueError("Invalid payload")
         else:
-            self.payload = payload
+            self.payload = payload # Sets to None if user does not input. This is for if you print packet information.
             
         if isinstance(num_pkts, int):
             self.num_pkts = num_pkts
@@ -99,6 +106,7 @@ class Packet:
             
     def create_packet(self):
         ip = IP(dst = self.dst_ip) # Sets destination IPv4 for IP layer
+        ether = Ether() # Creates ethernet layer for link layer
         
         if self.payload:
             payload = Raw(load = self.payload.encode())
@@ -133,7 +141,12 @@ class Packet:
         pkt = ip / layer4
         
         if self.dst_mac: # If packet contains destination MAC address by user, the packet is automatically created at layer 2
-            pkt = Ether(dst = self.dst_mac) / pkt
+            ether.dmac = self.dst_mac
+            pkt = ether / pkt
+            
+        if self.src_mac:
+            ether.smac = self.src_mac
+            pkt = ether / pkt
             
         if payload:
             pkt = pkt / payload
@@ -145,10 +158,10 @@ class Packet:
         index = 1
         
         while index <= self.num_pkts:
-            if self.dst_mac is None: # Send is a layer 3 function while sendp is a layer 2 function, so if MAC is provided, it uses sendp
-                send(pkt, verbose=0)
-            else:
+            if self.dst_mac or self.src_mac: # Send is a layer 3 function while sendp is a layer 2 function, so if MAC is provided, it uses sendp
                 sendp(pkt, verbose=0)
+            else:
+                send(pkt, verbose=0)
                 
             log_packet(self, None, True)
             index += 1
@@ -158,7 +171,7 @@ class Packet:
         index = 1
         
         while index <= self.num_pkts:
-            if self.dst_mac:
+            if self.dst_mac or self.src_mac:
                 response = srp1(pkt, timeout=3, verbose=0)
             else:
                 response = sr1(pkt, timeout=3, verbose=0)
@@ -176,7 +189,7 @@ class Packet:
     def __str__(self): # Returns packet information to be printed
         return(f"Destination IPv4: {self.dst_ip}\nProtocol: {self.protocol.upper()}\nDestination port: {self.dst_port}\n"
               + f"Flags: {self.flags}\nDestination MAC address: {self.dst_mac}\nSource port: {self.src_port}\n"
-              + f"Source IPv4: {self.src_ip}, Payload: {self.payload}")
+              + f"Source IPv4: {self.src_ip}, Source MAC: {self.src_mac}, Payload: {self.payload}")
         
 def hash_data(data:str) -> str: # Takes MAC and IPv4 addresses and hashes using SHA256 if anonymize mode is set to True
     return hashlib.sha256(data.encode()).hexdigest()
@@ -192,6 +205,7 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
             dst_ip TEXT,
             src_ip TEXT,
             dst_mac TEXT,
+            src_mac TEXT,
             protocol TEXT,
             dst_port INTEGER,
             src_port INTEGER,
@@ -205,19 +219,21 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
     dst_ip = hash_data(packet.dst_ip) if (packet.dst_ip and anonymize) else packet.dst_ip  # Hashes sensitive daya
     src_ip = hash_data(packet.src_ip) if (packet.src_ip and anonymize) else packet.src_ip
     dst_mac = hash_data(packet.dst_mac) if (packet.dst_mac and anonymize) else packet.dst_mac
+    src_mac = hash_data(packet.src_mac) if (packet.src_mac and anonymize) else packet.src_mac
     payload = hash_data(packet.payload) if (packet.payload and anonymize) else packet.payload
     
     c.execute("""
         INSERT INTO packet_history (
-            timestamp, dst_ip, src_ip, dst_mac, protocol, 
+            timestamp, dst_ip, src_ip, dst_mac, src_mac, protocol, 
             dst_port, src_port, flags, payload, response
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
     """, (
         datetime.now().isoformat(), # Logs date and time of packet
         dst_ip,
         src_ip,
         dst_mac,
+        src_mac,
         packet.protocol,
         packet.dst_port,
         packet.src_port,
@@ -230,8 +246,8 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
     conn.close()
     
 def main():
-    pkt3 = Packet("129.21.72.179", "UDP", 1, None, None, 2, None, "haha", 100)
-    pkt3.sr_packet()
+    pkt3 = Packet("129.21.72.179", "UDP", 12, None, None, 6, None, "ff:fe:76:89:01:41", "heheheha", 4)
+    pkt3.s_packet()
     
 if __name__ == "__main__":
     main()
