@@ -15,10 +15,11 @@ import ipaddress, re, sqlite3, hashlib
 from datetime import datetime
 
 class Packet:
-    __slots__ = ["dst_ip","dst_mac","protocol","dst_port","flags","src_port","src_ip","payload"]
+    __slots__ = ["dst_ip","dst_mac","protocol","dst_port","flags","src_port","src_ip","payload","num_pkts"]
     
     def __init__(self,dst_ip:str,protocol:str,dst_port:int|None=None,flags:str|list|None=None,
-                 dst_mac:str|None=None,src_port:int|None=None,src_ip:str|None=None,payload:str|None=None):
+                 dst_mac:str|None=None,src_port:int|None=None,src_ip:str|None=None,payload:str|None=None,
+                 num_pkts:int=1):
         
         protocol = protocol.lower() # Sets protocol to lower case to verify
         
@@ -62,6 +63,11 @@ class Packet:
                 raise ValueError("Invalid payload")
         else:
             self.payload = payload
+            
+        if isinstance(num_pkts,int):
+            self.num_pkts = num_pkts
+        else:
+            raise ValueError("Invalid number of packets")
 
         if protocol in ("tcp","udp"):
             self.protocol = protocol
@@ -134,28 +140,34 @@ class Packet:
     
     def s_packet(self): # Sends one packet
         pkt = self.create_packet()
+        index = 1
         
-        log_packet(self,None,True)
-        
-        if self.dst_mac is None: # Send is a layer 3 function while sendp is a layer 2 function, so if MAC is provided, it uses sendp
-            send(pkt,verbose=0)
-        else:
-            sendp(pkt,verbose=0)
+        while index <= self.num_pkts:
+            if self.dst_mac is None: # Send is a layer 3 function while sendp is a layer 2 function, so if MAC is provided, it uses sendp
+                send(pkt,verbose=0)
+            else:
+                sendp(pkt,verbose=0)
+                
+            log_packet(self,None,True)
+            index+=1
             
     def sr_packet(self): # Sends and receives one packet (same as above, except for srp1 and sr1)
         pkt = self.create_packet()
+        index = 1
         
-        if self.dst_mac:
-            response = srp1(pkt,timeout=1,verbose=0)
-        else:
-            response = sr1(pkt,timeout=1,verbose=0)
+        while index <= self.num_pkts:
+            if self.dst_mac:
+                response = srp1(pkt,timeout=3,verbose=0)
+            else:
+                response = sr1(pkt,timeout=3,verbose=0)
+                
+            if response: # If packet received a response, this will print it
+                print(f"Received: {response.summary()}")
+            else:
+                print("No response")
             
-        if response: # If packet received a response, this will print it
-            print(f"Received: {response.summary()}")
-        else:
-            print("No response")
-            
-        log_packet(self,response_summary=response.summary() if response else "No response",anonymize=True)
+            log_packet(self,response_summary=response.summary() if response else "No response",anonymize=True)
+            index+=1
             
         return response
     
@@ -216,11 +228,8 @@ def log_packet(packet:Packet,response_summary:str|None=None,anonymize=True): # C
     conn.close()
     
 def main():
-    pkt1 = Packet("129.21.72.179","TCP",82,"S",None,448,None,"Noah was here")
-    pkt1.s_packet()
-    
-    pkt2 = Packet("129.21.72.179","ICMP",None,None,None,None,None,"Noah was here!")
-    pkt2.s_packet()
+    pkt3 = Packet("129.21.72.179","UDP",1,None,None,2,None,"haha",100)
+    pkt3.sr_packet()
     
 if __name__ == "__main__":
     main()
