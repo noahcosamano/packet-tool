@@ -3,28 +3,30 @@ DISCLAIMER: This program is intended for educational purposes only. It must NOT 
 for activities such as probing, flooding, scanning, or any unauthorized network access. Always use
 this tool within a controlled environment such as a private lab network or virtual environment.
 
-This program is a basic packet crafter that supports TCP, UDP, and ICMP protocols. It allows sending packets
-with a specified destination MAC address for Layer 2 traffic, as well as destination IPv4 addresses
-for Layer 3 traffic. It also supports crafting packets with spoofed source IPv4 addresses and source ports.
+This program is a basic packet crafter that supports TCP, UDP, and ICMP protocols. It allows sending any number
+of packets at once with a specified destination MAC address for Layer 2 traffic, as well as destination IPv4 addresses
+for Layer 3 traffic. It also supports crafting packets with payloads, spoofed source IPv4 addresses and source ports.
+All packet information and responses sent through this tool will also be logged into a seperate SQL database with hashed IPv4
+addresses, MAC addresses, and payloads.
 
 Author: Noah Cosamano
 """
 
-from scapy.all import TCP,sr1,sr,srp1,srp,send,sendp,IP,UDP,Ether,ICMP,Raw
+from scapy.all import TCP, sr1, srp1, send, sendp, IP, UDP, Ether, ICMP, Raw
 import ipaddress, re, sqlite3, hashlib
 from datetime import datetime
 
 class Packet:
-    __slots__ = ["dst_ip","dst_mac","protocol","dst_port","flags","src_port","src_ip","payload","num_pkts"]
+    __slots__ = ["dst_ip", "dst_mac", "protocol", "dst_port", "flags", "src_port", "src_ip", "payload", "num_pkts"]
     
-    def __init__(self,dst_ip:str,protocol:str,dst_port:int|None=None,flags:str|list|None=None,
-                 dst_mac:str|None=None,src_port:int|None=None,src_ip:str|None=None,payload:str|None=None,
-                 num_pkts:int=1):
+    def __init__(self, dst_ip:str, protocol:str, dst_port:int|None = None, flags:str|list|None = None,
+                 dst_mac:str|None = None, src_port:int|None = None, src_ip:str|None = None, payload:str|None = None,
+                 num_pkts:int = 1):
         
         protocol = protocol.lower() # Sets protocol to lower case to verify
         
         if dst_mac:
-            if not re.match(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$',dst_mac): # Ensures MAC address is valid format
+            if not re.match(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$', dst_mac): # Ensures MAC address is valid format
                 raise ValueError("Invalid MAC address")
             self.dst_mac = dst_mac
         else:
@@ -32,7 +34,7 @@ class Packet:
         
         if flags:
             for flag in flags:
-                if flag.lower() not in ("f","s","r","p","a","u"): # Ensures flag is a valid flag for TCP
+                if flag.lower() not in ("f", "s", "r", "p", "a", "u"): # Ensures flag is a valid flag for TCP
                     raise ValueError("Invalid TCP flag(s)")
             self.flags = flags
         else:
@@ -64,16 +66,16 @@ class Packet:
         else:
             self.payload = payload
             
-        if isinstance(num_pkts,int):
+        if isinstance(num_pkts, int):
             self.num_pkts = num_pkts
         else:
             raise ValueError("Invalid number of packets")
 
-        if protocol in ("tcp","udp"):
+        if protocol in ("tcp", "udp"):
             self.protocol = protocol
             if dst_port is None:
                 raise ValueError("TCP and UDP require a destination port")
-            elif isinstance(dst_port,int) and 1 <= dst_port <= 65_535: # TCP and UDP only have 65,535 ports, anything more than this is an error.
+            elif isinstance(dst_port, int) and 1 <= dst_port <= 65_535: # TCP and UDP only have 65,535 ports, anything more than this is an error.
                 self.dst_port = dst_port
             else:
                 raise ValueError("Invalid port")
@@ -91,15 +93,15 @@ class Packet:
             raise ValueError("Invalid protocol")
         
         if src_port:
-            if not isinstance(src_port,int) or not (1 <= src_port <= 65535):
+            if not isinstance(src_port, int) or not (1 <= src_port <= 65535):
                 raise ValueError("Invalid port")
         self.src_port = src_port # Sets to None if user does not input. This is for if you print packet information.
             
     def create_packet(self):
-        ip = IP(dst=self.dst_ip) # Sets destination IPv4 for IP layer
+        ip = IP(dst = self.dst_ip) # Sets destination IPv4 for IP layer
         
         if self.payload:
-            payload = Raw(load=self.payload.encode())
+            payload = Raw(load = self.payload.encode())
         else:
             payload = None
         
@@ -107,7 +109,7 @@ class Packet:
             ip.src = self.src_ip
         
         if self.protocol == "tcp":
-            tcp = TCP(dport=self.dst_port)
+            tcp = TCP(dport = self.dst_port)
             if self.src_port:
                 tcp.sport = self.src_port
             if self.flags:
@@ -117,7 +119,7 @@ class Packet:
         elif self.protocol == "udp":
             if self.flags:
                 raise ValueError("UDP does not support flags")
-            udp = UDP(dport=self.dst_port)
+            udp = UDP(dport = self.dst_port)
             if self.src_port:
                 udp.sport = self.src_port
             layer4 = udp
@@ -131,7 +133,7 @@ class Packet:
         pkt = ip / layer4
         
         if self.dst_mac: # If packet contains destination MAC address by user, the packet is automatically created at layer 2
-            pkt = Ether(dst=self.dst_mac) / pkt
+            pkt = Ether(dst = self.dst_mac) / pkt
             
         if payload:
             pkt = pkt / payload
@@ -144,12 +146,12 @@ class Packet:
         
         while index <= self.num_pkts:
             if self.dst_mac is None: # Send is a layer 3 function while sendp is a layer 2 function, so if MAC is provided, it uses sendp
-                send(pkt,verbose=0)
+                send(pkt, verbose=0)
             else:
-                sendp(pkt,verbose=0)
+                sendp(pkt, verbose=0)
                 
-            log_packet(self,None,True)
-            index+=1
+            log_packet(self, None, True)
+            index += 1
             
     def sr_packet(self): # Sends and receives one packet (same as above, except for srp1 and sr1)
         pkt = self.create_packet()
@@ -157,17 +159,17 @@ class Packet:
         
         while index <= self.num_pkts:
             if self.dst_mac:
-                response = srp1(pkt,timeout=3,verbose=0)
+                response = srp1(pkt, timeout=3, verbose=0)
             else:
-                response = sr1(pkt,timeout=3,verbose=0)
+                response = sr1(pkt, timeout=3, verbose=0)
                 
             if response: # If packet received a response, this will print it
                 print(f"Received: {response.summary()}")
             else:
                 print("No response")
             
-            log_packet(self,response_summary=response.summary() if response else "No response",anonymize=True)
-            index+=1
+            log_packet(self, response_summary = response.summary() if response else "No response", anonymize = True)
+            index += 1
             
         return response
     
@@ -179,7 +181,7 @@ class Packet:
 def hash_data(data:str) -> str: # Takes MAC and IPv4 addresses and hashes using SHA256 if anonymize mode is set to True
     return hashlib.sha256(data.encode()).hexdigest()
     
-def log_packet(packet:Packet,response_summary:str|None=None,anonymize=True): # Creates a log of packets and responses if given one
+def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True): # Creates a log of packets and responses if given one
     conn = sqlite3.connect("packet_history.sqlite") # seperate SQL db file
     c = conn.cursor()
     
@@ -228,7 +230,7 @@ def log_packet(packet:Packet,response_summary:str|None=None,anonymize=True): # C
     conn.close()
     
 def main():
-    pkt3 = Packet("129.21.72.179","UDP",1,None,None,2,None,"haha",100)
+    pkt3 = Packet("129.21.72.179", "UDP", 1, None, None, 2, None, "haha", 100)
     pkt3.sr_packet()
     
 if __name__ == "__main__":
