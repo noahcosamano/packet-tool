@@ -10,15 +10,15 @@ for Layer 3 traffic. It also supports crafting packets with spoofed source IPv4 
 Author: Noah Cosamano
 """
 
-from scapy.all import TCP,sr1,sr,srp1,srp,send,sendp,IP,UDP,Ether,ICMP
+from scapy.all import TCP,sr1,sr,srp1,srp,send,sendp,IP,UDP,Ether,ICMP,Raw
 import ipaddress, re, sqlite3, hashlib
 from datetime import datetime
 
 class Packet:
-    __slots__ = ["dst_ip","dst_mac","protocol","dst_port","flags","src_port","src_ip"]
+    __slots__ = ["dst_ip","dst_mac","protocol","dst_port","flags","src_port","src_ip","payload"]
     
     def __init__(self,dst_ip:str,protocol:str,dst_port:int|None=None,flags:str|list|None=None,
-                 dst_mac:str|None=None,src_port:int|None=None,src_ip:str|None=None):
+                 dst_mac:str|None=None,src_port:int|None=None,src_ip:str|None=None,payload:str|None=None):
         
         protocol = protocol.lower() # Sets protocol to lower case to verify
         
@@ -54,6 +54,14 @@ class Packet:
                 raise ValueError("Invalid source IP address")
         else:
             self.src_ip = src_ip # Sets to None if user does not input. This is for if you print packet information.
+            
+        if payload:
+            if isinstance(payload, str):
+                self.payload = payload
+            else:
+                raise ValueError("Invalid payload")
+        else:
+            self.payload = payload
 
         if protocol in ("tcp","udp"):
             self.protocol = protocol
@@ -84,6 +92,11 @@ class Packet:
     def create_packet(self):
         ip = IP(dst=self.dst_ip) # Sets destination IPv4 for IP layer
         
+        if self.payload:
+            payload = Raw(load=self.payload.encode())
+        else:
+            payload = None
+        
         if self.src_ip:
             ip.src = self.src_ip
         
@@ -113,6 +126,9 @@ class Packet:
         
         if self.dst_mac: # If packet contains destination MAC address by user, the packet is automatically created at layer 2
             pkt = Ether(dst=self.dst_mac) / pkt
+            
+        if payload:
+            pkt = pkt / payload
             
         return pkt
     
@@ -146,17 +162,17 @@ class Packet:
     def __str__(self): # Returns packet information to be printed
         return(f"Destination IPv4: {self.dst_ip}\nProtocol: {self.protocol.upper()}\nDestination port: {self.dst_port}\n"
               + f"Flags: {self.flags}\nDestination MAC address: {self.dst_mac}\nSource port: {self.src_port}\n"
-              + f"Source IPv4: {self.src_ip}")
+              + f"Source IPv4: {self.src_ip}, Payload: {self.payload}")
         
-def hash_data(data:str) -> str:
+def hash_data(data:str) -> str: # Takes MAC and IPv4 addresses and hashes using SHA256 if anonymize mode is set to True
     return hashlib.sha256(data.encode()).hexdigest()
     
-def log_packet(packet:Packet,response_summary:str|None=None,anonymize=True):
-    conn = sqlite3.connect("packet_history.sqlite")
+def log_packet(packet:Packet,response_summary:str|None=None,anonymize=True): # Creates a log of packets and responses if given one
+    conn = sqlite3.connect("packet_history.sqlite") # seperate SQL db file
     c = conn.cursor()
     
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS packet_history (
+    c.execute(""" 
+        CREATE TABLE IF NOT EXISTS packet_history ( 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
             dst_ip TEXT,
@@ -166,22 +182,25 @@ def log_packet(packet:Packet,response_summary:str|None=None,anonymize=True):
             dst_port INTEGER,
             src_port INTEGER,
             flags TEXT,
+            payload TEXT,
             response TEXT
         )
     """)
+    # ^ Creates a new table if one is not made already in file. Contains all information of packet.
     
-    dst_ip = hash_data(packet.dst_ip) if (packet.dst_ip and anonymize) else packet.dst_ip
+    dst_ip = hash_data(packet.dst_ip) if (packet.dst_ip and anonymize) else packet.dst_ip  # Hashes sensitive daya
     src_ip = hash_data(packet.src_ip) if (packet.src_ip and anonymize) else packet.src_ip
     dst_mac = hash_data(packet.dst_mac) if (packet.dst_mac and anonymize) else packet.dst_mac
+    payload = hash_data(packet.payload) if (packet.payload and anonymize) else packet.payload
     
     c.execute("""
         INSERT INTO packet_history (
-            timestamp, dst_ip, src_ip, dst_mac,
-            protocol, dst_port, src_port, flags, response
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            timestamp, dst_ip, src_ip, dst_mac, protocol, 
+            dst_port, src_port, flags, payload, response
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
     """, (
-        datetime.now().isoformat(),
+        datetime.now().isoformat(), # Logs date and time of packet
         dst_ip,
         src_ip,
         dst_mac,
@@ -189,21 +208,19 @@ def log_packet(packet:Packet,response_summary:str|None=None,anonymize=True):
         packet.dst_port,
         packet.src_port,
         ','.join(packet.flags) if packet.flags else None,
+        payload,
         response_summary
     ))
     
-    conn.commit()
+    conn.commit() # Pushes changes to SQL file
     conn.close()
     
 def main():
-    pkt1 = Packet("129.21.72.179","TCP",80,"S",None,90,None)
+    pkt1 = Packet("129.21.72.179","TCP",82,"S",None,448,None,"Noah was here")
     pkt1.s_packet()
     
-    pkt2 = Packet("129.21.72.179","TCP",80,"S",None,445,None)
-    pkt2.sr_packet()
-    
-    pkt3 = Packet("129.21.72.179","ICMP",None,None,None,None,None)
-    pkt3.s_packet()
+    pkt2 = Packet("129.21.72.179","ICMP",None,None,None,None,None,"Noah was here!")
+    pkt2.s_packet()
     
 if __name__ == "__main__":
     main()
