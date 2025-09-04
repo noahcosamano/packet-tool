@@ -140,12 +140,9 @@ class Packet:
         
         pkt = ip / layer4
         
-        if self.dst_mac: # If packet contains destination MAC address by user, the packet is automatically created at layer 2
-            ether.dmac = self.dst_mac
-            pkt = ether / pkt
-            
-        if self.src_mac:
-            ether.smac = self.src_mac
+        if self.dst_mac or self.src_mac:
+            if self.dst_mac: ether.dst = self.dst_mac
+            if self.src_mac: ether.src = self.src_mac
             pkt = ether / pkt
             
         if payload:
@@ -246,7 +243,7 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
     conn.close()
     
 def main():
-    pkt3 = Packet("129.21.72.179", "UDP", 12, None, None, 6, None, "ff:fe:76:89:01:41", "heheheha", 4)
+    pkt3 = Packet("129.21.72.179", "TCP", 12, None, None, 6, None, None, "heheheha", 10)
     pkt3.s_packet()
     
 if __name__ == "__main__":
