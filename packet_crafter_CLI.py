@@ -20,7 +20,7 @@ def parse_cli():
         user_input = get_user_input()
         
         if user_input is None:
-            get_user_input()
+            continue
         
         input_list = user_input.split()
         input_translated = {}
@@ -32,9 +32,11 @@ def parse_cli():
             if command in translation:
                 try:
                     value = input_list[index + 1]
+                    if value in translation:
+                        raise ValueError(f"Missig value for {command}")
                     input_translated[translation[command]] = value
                     index += 2
-                except IndexError:
+                except ValueError:
                     print(f"Missing value for {command}")
                     break
             else:
@@ -45,27 +47,34 @@ def parse_cli():
             return input_translated
         
 def verify_field(translated_data: dict):
-    for item, key in translated_data.items():
-        match item.lower():
-            case "protocol":
-                validate_protocol(key)
-            case "dst_ip" | "src_ip":
-                validate_ip(key)
-            case "dst_mac" | "src_mac":
-                validate_mac(key)
-            case "flags":
-                validate_tcp_flags(key)
-            case "dst_port" | "src_port":
-                validate_port(key)
-            case "num_pkts":
-                validate_num_pkts(key)
-            case "arp_op":
-                validate_arp_op(key)
-            case "payload":
-                validate_payload(key)
+    try:
+        for item, key in translated_data.items():
+            match item.lower():
+                case "protocol":
+                    validate_protocol(key)
+                case "dst_ip" | "src_ip":
+                    validate_ip(key)
+                case "dst_mac" | "src_mac":
+                    validate_mac(key)
+                case "flags":
+                    validate_tcp_flags(key)
+                case "dst_port" | "src_port":
+                    validate_port(key)
+                case "num_pkts":
+                    validate_num_pkts(key)
+                case "arp_op":
+                    validate_arp_op(key)
+                case "payload":
+                    validate_payload(key)
+        
+        return True
+    except Exception as e:
+        print(e)
+        return False
 
 def translate_to_pkt(translated_data):
-    verify_field(translated_data)
+    if not verify_field(translated_data):
+        return False
     
     int_fields = ["dst_port","src_port","num_pkts","arp_op"]
     for field in int_fields:
