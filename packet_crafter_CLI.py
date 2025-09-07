@@ -1,4 +1,4 @@
-from packet_crafter_logic import Packet
+from packet_crafter_logic import *
 
 translation = {"-p" : "protocol",
                "-dip" : "dst_ip",
@@ -15,32 +15,78 @@ translation = {"-p" : "protocol",
 def get_user_input():
     return input(">> ")
         
-def parse_cli(user_input = get_user_input()):
-    if user_input is None:
+def parse_cli():
+    while True:
         user_input = get_user_input()
-    
-    input_list = user_input.split()
-    input_translated = {}
-    index = 0
-    
-    while index < len(input_list):
-        command = input_list[index]
         
-        if command in translation:
-            try:
-                value = input_list[index + 1]
-                input_translated[translation[command]] = value
-                index += 2
-            except IndexError:
-                print(f"Missing value for {command}")
+        if user_input is None:
+            get_user_input()
+        
+        input_list = user_input.split()
+        input_translated = {}
+        index = 0
+        
+        while index < len(input_list):
+            command = input_list[index]
+            
+            if command in translation:
+                try:
+                    value = input_list[index + 1]
+                    input_translated[translation[command]] = value
+                    index += 2
+                except IndexError:
+                    print(f"Missing value for {command}")
+                    break
+            else:
+                print(f"Unknown command: {command}")
+                break
+            
         else:
-            print(f"Unknown command {command}")
-            index += 1
+            return input_translated
+        
+def verify_field(translated_data: dict):
+    for item, key in translated_data.items():
+        match item.lower():
+            case "protocol":
+                validate_protocol(key)
+            case "dst_ip" | "src_ip":
+                validate_ip(key)
+            case "dst_mac" | "src_mac":
+                validate_mac(key)
+            case "flags":
+                validate_tcp_flags(key)
+            case "dst_port" | "src_port":
+                validate_port(key)
+            case "num_pkts":
+                validate_num_pkts(key)
+            case "arp_op":
+                validate_arp_op(key)
+            case "payload":
+                validate_payload(key)
+
+def translate_to_pkt(translated_data):
+    verify_field(translated_data)
     
-    return input_translated
+    int_fields = ["dst_port","src_port","num_pkts","arp_op"]
+    for field in int_fields:
+        if field in translated_data:
+            try:
+                translated_data[field] = int(translated_data[field])
+            except ValueError:
+                print(f"Invalid integer for {field}")
+                return
+    
+    try:
+        pkt = Packet(**translated_data)
+        print(f"Packet created successfully: {pkt}")
+    except Exception as e:
+        print(f"Error creating packet: {e}")
     
 def main():
-    parse_cli()
+    while True:
+        translated_data = parse_cli()
+        if translated_data:
+            translate_to_pkt(translated_data)
     
 if __name__ == "__main__":
     main()
