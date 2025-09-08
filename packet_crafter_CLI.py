@@ -18,52 +18,84 @@ def get_user_input():
 def parse_cli():
     while True:
         user_input = get_user_input()
-        
-        if user_input is None:
+        if not user_input:
             continue
         
-        input_list = user_input.split()
         input_translated = {}
-        index = 0
+        tokens = []
+        quotes = False
+        buffer = ""
         
-        while index < len(input_list):
-            command = input_list[index]
+        for part in user_input.strip().split():
+            if part.startswith('"') and not part.endswith('"'):
+                quotes = True
+                buffer = part[1:]
+            elif quotes:
+                if part.endswith('"'):
+                    buffer += " " + part[:-1]
+                    tokens.append(buffer)
+                    buffer = ""
+                    in_quotes = False
+                else:
+                    buffer += " " + part
+            else:
+                tokens.append(part)
+                
+        if in_quotes:
+            print("Error: unclosed quotes in input")
+            continue
+        
+        index = 0
+        while index < len(tokens):
+            command = tokens[index]
             
             if command in translation:
                 try:
-                    value = input_list[index + 1]
-                    if value in translation:
-                        raise ValueError(f"Missig value for {command}")
+                    value = tokens[index + 1]
+                    if value.startswith("-") and value in translation:
+                        raise ValueError(f"Error: Missing value for {command}")
+                    
                     input_translated[translation[command]] = value
                     index += 2
-                except ValueError:
-                    print(f"Missing value for {command}")
+                except IndexError:
+                    print(f"Error: Missing value for {command}")
                     break
             else:
-                print(f"Unknown command: {command}")
+                print(f"Error: Unknown command: {command}")
                 break
-            
         else:
             return input_translated
         
+def parse_payload(payload: str) -> str:
+    if not (payload.startswith('"') and payload.endswith('"')):
+        raise ValueError("Error: payload must be surrounded in quotation marks")
+    return payload.strip('"')
+        
 def verify_field(translated_data: dict):
     try:
+        protocol = None
         for item, key in translated_data.items():
             match item.lower():
                 case "protocol":
-                    validate_protocol(key)
+                    protocol = validate_protocol(key)
                 case "dst_ip" | "src_ip":
                     validate_ip(key)
                 case "dst_mac" | "src_mac":
-                    validate_mac(key)
+                    if protocol == None:
+                        raise ValueError("Error: Protocol missing")
+                    validate_mac(key, protocol)
                 case "flags":
-                    validate_tcp_flags(key)
+                    if protocol == None:
+                        raise ValueError("Error: Protocol missing")
+                    validate_tcp_flags(key, protocol)
                 case "dst_port" | "src_port":
-                    validate_port(key)
+                    if protocol == None:
+                        raise ValueError("Error: Protocol missing")
+                    validate_port(key, protocol)
                 case "num_pkts":
                     validate_num_pkts(key)
                 case "arp_op":
-                    validate_arp_op(key)
+                    validate_arp_op(key, protocol)
                 case "payload":
                     validate_payload(key)
         
@@ -89,7 +121,7 @@ def translate_to_pkt(translated_data):
         pkt = Packet(**translated_data)
         print(f"Packet created successfully: {pkt}")
     except Exception as e:
-        print(f"Error creating packet: {e}")
+        print(e)
     
 def main():
     while True:
