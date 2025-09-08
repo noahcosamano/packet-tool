@@ -11,13 +11,10 @@ translation = {"-p" : "protocol",
                "-np" : "num_pkts",
                "-pl" : "payload",
                "-op" : "arp_op"}
-
-def get_user_input():
-    return input(">> ")
         
 def parse_cli():
     while True:
-        user_input = get_user_input()
+        user_input = input(">> ")
         if not user_input:
             continue
         
@@ -35,13 +32,13 @@ def parse_cli():
                     buffer += " " + part[:-1]
                     tokens.append(buffer)
                     buffer = ""
-                    in_quotes = False
+                    quotes = False
                 else:
                     buffer += " " + part
             else:
                 tokens.append(part)
                 
-        if in_quotes:
+        if quotes:
             print("Error: unclosed quotes in input")
             continue
         
@@ -53,7 +50,8 @@ def parse_cli():
                 try:
                     value = tokens[index + 1]
                     if value.startswith("-") and value in translation:
-                        raise ValueError(f"Error: Missing value for {command}")
+                        print(f"Error: Missing value for {command}")
+                        break
                     
                     input_translated[translation[command]] = value
                     index += 2
@@ -82,15 +80,15 @@ def verify_field(translated_data: dict):
                     validate_ip(key)
                 case "dst_mac" | "src_mac":
                     if protocol == None:
-                        raise ValueError("Error: Protocol missing")
+                        raise ValueError("Error: Protocol required")
                     validate_mac(key, protocol)
                 case "flags":
                     if protocol == None:
-                        raise ValueError("Error: Protocol missing")
+                        raise ValueError("Error: Protocol required")
                     validate_tcp_flags(key, protocol)
                 case "dst_port" | "src_port":
                     if protocol == None:
-                        raise ValueError("Error: Protocol missing")
+                        raise ValueError("Error: Protocol required")
                     validate_port(key, protocol)
                 case "num_pkts":
                     validate_num_pkts(key)
