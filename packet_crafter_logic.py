@@ -268,21 +268,3 @@ def log_packet(packet:Packet, response_summary:str|None = None, anonymize=True):
     
     conn.commit() # Pushes changes to SQL file
     conn.close()
-    
-def main():
-    
-   Packet(
-            dst_ip="192.168.1.1",
-            protocol="arp",
-            dst_port=None,
-            flags=None,
-            dst_mac=None,
-            src_port=None,
-            src_ip="192.168.1.2",
-            src_mac="ff:ee:dd:cc:bb:aa",
-            payload=None,
-            num_pkts=2,
-        )
-    
-if __name__ == "__main__":
-    main()
