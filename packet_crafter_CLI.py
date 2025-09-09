@@ -1,4 +1,5 @@
 from packet_crafter_logic import *
+import time, sys
 
 translation = {"-p" : "protocol",
                "-dip" : "dst_ip",
@@ -11,14 +12,34 @@ translation = {"-p" : "protocol",
                "-np" : "num_pkts",
                "-pl" : "payload",
                "-op" : "arp_op"}
+
+ALL_COMMANDS = {"? / help": "Displays help",
+                "exit" : "Exits the program",
+                "--s": "Sends packet after packet has been created",
+                "--sr": "Sends packet and waits for reply after packet has been created",
+                "(command) ?" : "Lists all options for command, (eg. -p ?)",
+                "-p": "Protocol",
+                "-dip": "Destination IPv4",
+                "-sip": "Source IPv4",
+                "-dp" : "Destination port",
+                "-sp" : "Source port",
+                "-dm" : "Destination mac",
+                "-sm" : "Sourcemac",
+                "-f" : "Flags",
+                "-np" : "Number of packets",
+                "-pl" : "Payload",
+                "-op" : "ARP operator"}
       
 def get_user_input():
     while True:
         user_input = input(">> ").lower() 
         
         if user_input in ("help","?"):
-            for flag, meaning in translation.items():
-                print(f"  {flag} -> {meaning}") 
+            for command, meaning in ALL_COMMANDS.items():
+                print(f"  {command} -> {meaning}") 
+                
+        elif user_input == "exit":
+            sys.exit()
                 
         else:
             return user_input
@@ -95,6 +116,7 @@ def parse_cli():
                 except IndexError:
                     print(f"  Error: Missing value for {command}")
                     break
+                
             else:
                 print(f"  Error: Unknown command: {command}")
                 break
@@ -135,6 +157,8 @@ def verify_field(translated_data: dict):
         return False
 
 def translate_to_pkt(translated_data):
+    global PACKET
+    
     if not verify_field(translated_data):
         return False
     
@@ -149,9 +173,23 @@ def translate_to_pkt(translated_data):
     
     try:
         pkt = Packet(**translated_data)
-        print(f"  Packet created successfully: {pkt}")
+        print(f"  {pkt.protocol.upper()} packet created")
+        command_pkt(pkt)
     except Exception as e:
         print(e)
+        
+def command_pkt(packet : Packet):
+    command = input("Enter packet command >> ").lower()
+    
+    if command == "--s":
+        print(f"  {packet.protocol.upper()} packet sent successfully")
+        packet.send_packet()
+    elif command == "--sr":
+        print(f"  {packet.protocol.upper()} packet sent successfully. Waiting for response...")
+        time.sleep(2)
+        packet.send_receive_packet()
+    else:
+        print("  Error: invalid command. Deleting packet...")
     
 def main():
     while True:
