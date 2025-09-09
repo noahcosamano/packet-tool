@@ -1,19 +1,5 @@
-"""
-DISCLAIMER: This program is intended for educational purposes only. It must NOT be used maliciously
-for activities such as probing, flooding, scanning, or any unauthorized network access. Always use
-this tool within a controlled environment such as a private lab network or virtual environment.
-
-This program is a basic packet crafter that supports TCP, UDP, and ICMP protocols. It allows sending any number
-of packets at once with a specified destination MAC address for Layer 2 traffic, as well as destination IPv4 addresses
-for Layer 3 traffic. It also supports crafting packets with payloads, spoofed source IPv4 addresses and source ports.
-All packet information and responses sent through this tool will also be logged into a seperate SQL database with hashed IPv4
-addresses, MAC addresses, and payloads.
-
-Author: Noah Cosamano
-"""
-
 from scapy.all import TCP, sr1, srp1, send, sendp, IP, UDP, Ether, ICMP, Raw, ARP
-import ipaddress, re, sqlite3, hashlib, nmap
+import ipaddress, re, sqlite3, hashlib
 from datetime import datetime
 
 VALID_MAC = re.compile(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')

@@ -1,3 +1,19 @@
+"""
+DISCLAIMER: This program is intended for educational purposes only. It must NOT be used maliciously
+for activities such as probing, flooding, scanning, or any unauthorized network access. Always use
+this tool within a controlled environment such as a private lab network or virtual environment.
+
+This program is a basic packet crafter that supports TCP, UDP, ICMP, and ARP protocols. When ran, it opens
+a prompt that allows users to create and send packets at the command line using specific commands. This 
+program allows sending a capped number of packets at once with a specified destination MAC address for Layer 
+2 traffic, as well as destination IPv4 addresses for Layer 3 traffic. It also supports crafting packets with 
+payloads, spoofed source IPv4 addresses, source ports, and MAC addresses. All packet information and responses
+sent through this tool will also be logged into a seperate SQL database with hashed IPv4 addresses, MAC 
+addresses, and payloads.
+
+Author: Noah Cosamano
+"""
+
 from packet_crafter_logic import *
 import time, sys
 
