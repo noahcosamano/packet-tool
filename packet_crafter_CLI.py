@@ -11,10 +11,43 @@ translation = {"-p" : "protocol",
                "-np" : "num_pkts",
                "-pl" : "payload",
                "-op" : "arp_op"}
+      
+def get_user_input():
+    while True:
+        user_input = input(">> ").lower() 
+        
+        if user_input in ("help","?"):
+            for flag, meaning in translation.items():
+                print(f"  {flag} -> {meaning}") 
+                
+        else:
+            return user_input
+        
+def flag_help(flag):
+    match flag:
+        case "-p":
+            for protocol in VALID_PROTOCOLS:
+                print(f"  {protocol}")
+        case "-dip" | "-sip":
+            print("  x.x.x.x, x = 1-255, (eg. 192.168.52.3)")
+        case "-dp" | "-sp":
+            print("  1-65535")
+        case "-dm" | "-sm":
+            print("  x:x:x:x:x:x, x = 1-9 a-F, (eg. a5:6e:f0:b3:e8:98)")
+        case "-f":
+            for flag in VALID_TCP_FLAGS:
+                print(f"  {flag}")
+        case "-np":
+            print("  1-500")
+        case "-pl":
+            print("  any text")
+        case "-op":
+            print("  1 or 2")
+            
         
 def parse_cli():
     while True:
-        user_input = input(">> ")
+        user_input = get_user_input()
         if not user_input:
             continue
         
@@ -39,7 +72,7 @@ def parse_cli():
                 tokens.append(part)
                 
         if quotes:
-            print("Error: unclosed quotes in input")
+            print("  Error: unclosed quotes in input")
             continue
         
         index = 0
@@ -50,24 +83,23 @@ def parse_cli():
                 try:
                     value = tokens[index + 1]
                     if value.startswith("-") and value in translation:
-                        print(f"Error: Missing value for {command}")
+                        print(f"  Error: Missing value for {command}")
+                        break
+                    
+                    elif value == "?":
+                        flag_help(command)
                         break
                     
                     input_translated[translation[command]] = value
                     index += 2
                 except IndexError:
-                    print(f"Error: Missing value for {command}")
+                    print(f"  Error: Missing value for {command}")
                     break
             else:
-                print(f"Error: Unknown command: {command}")
+                print(f"  Error: Unknown command: {command}")
                 break
         else:
             return input_translated
-        
-def parse_payload(payload: str) -> str:
-    if not (payload.startswith('"') and payload.endswith('"')):
-        raise ValueError("Error: payload must be surrounded in quotation marks")
-    return payload.strip('"')
         
 def verify_field(translated_data: dict):
     try:
@@ -80,15 +112,15 @@ def verify_field(translated_data: dict):
                     validate_ip(key)
                 case "dst_mac" | "src_mac":
                     if protocol == None:
-                        raise ValueError("Error: Protocol required")
+                        raise ValueError("  Error: Protocol required")
                     validate_mac(key, protocol)
                 case "flags":
                     if protocol == None:
-                        raise ValueError("Error: Protocol required")
+                        raise ValueError("  Error: Protocol required")
                     validate_tcp_flags(key, protocol)
                 case "dst_port" | "src_port":
                     if protocol == None:
-                        raise ValueError("Error: Protocol required")
+                        raise ValueError("  Error: Protocol required")
                     validate_port(key, protocol)
                 case "num_pkts":
                     validate_num_pkts(key)
@@ -112,12 +144,12 @@ def translate_to_pkt(translated_data):
             try:
                 translated_data[field] = int(translated_data[field])
             except ValueError:
-                print(f"Invalid integer for {field}")
+                print(f"  Invalid integer for {field}")
                 return
     
     try:
         pkt = Packet(**translated_data)
-        print(f"Packet created successfully: {pkt}")
+        print(f"  Packet created successfully: {pkt}")
     except Exception as e:
         print(e)
     
