@@ -1,35 +1,48 @@
-# Packet Crafter
+# PacketCrafter
 
-**A Python-based packet crafting and network testing tool built with Scapy.**  
-Supports TCP, UDP, and ICMP protocols, with features like IP spoofing, and flag control.
+**Author:** Noah Cosamano
 
-> ⚠️ This tool is intended **strictly for educational and lab use**. Do not use it on unauthorized networks.
+---
+
+## Overview
+
+**PacketCrafter** is a command-line based packet crafting tool designed for educational purposes. It supports crafting and sending packets using **TCP**, **UDP**, **ICMP**, and **ARP** protocols. Users can specify detailed packet parameters such as destination/source IP addresses, MAC addresses, ports, TCP flags, payloads, and ARP operations. 
+
+All packets sent and responses received are logged securely in a local SQL database, with sensitive data (IP addresses, MAC addresses, payloads) hashed for privacy.
+
+---
+
+## ⚠️ Important Disclaimer
+
+This program is intended **only for educational use** within controlled environments such as private lab networks or virtual labs. It **must NOT** be used for unauthorized activities like probing, flooding, scanning, or any form of unauthorized network access. 
+
+Misuse of this tool on production or public networks can be illegal and unethical.
 
 ---
 
 ## Features
 
-- Craft custom packets at Layer 2 and Layer 3
-- Send packets with:
-  - Custom source/destination IPs
-  - Spoofed ports
-  - TCP flags (`F`, `S`, `A`, `P`, `R`, `U`)
-  - Optional destination MAC address (Ethernet layer)
-- Supports:
-  - **TCP**
-  - **UDP**
-  - **ICMP**
-- Send-only or send-and-receive modes
-- Logs sent packets and responses to a `.csv` file
-- Optional hashing of sensitive data (e.g., IP, MAC)
-- Input validation for IP addresses, ports, flags, and MACs
+- Interactive CLI prompt for packet creation.
+- Support for protocols: TCP, UDP, ICMP, ARP.
+- Specify destination/source IPv4 and MAC addresses.
+- Customize ports, TCP flags, payloads, ARP operation types.
+- Send multiple packets in a single command (up to 500 packets).
+- Options to send packets normally or send and wait for replies.
+- Logs all packet details and responses into a local SQLite database with hashed sensitive data.
 
 ---
 
 ## Installation
 
-> Requires Python 3.10+ and `scapy`
+### Requirements
+
+- Python 3.7+
+- [Scapy](https://scapy.net/) library
+- SQLite3 (usually included in Python standard library)
+
+Install Scapy via pip:
 
 ```bash
-git clone https://github.com/yourusername/packet-crafter.git
-cd packet-crafter
+pip install scapy
+
+
