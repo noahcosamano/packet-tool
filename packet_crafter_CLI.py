@@ -29,7 +29,7 @@ translation = {"-p" : "protocol",
                "-pl" : "payload",
                "-op" : "arp_op"}
 
-ALL_COMMANDS = {"? / help": "Displays help",
+ALL_COMMANDS = {"? / help": "Displays all commands",
                 "exit" : "Exits the program",
                 "--s": "Sends packet after packet has been created",
                 "--sr": "Sends packet and waits for reply after packet has been created",
@@ -39,8 +39,8 @@ ALL_COMMANDS = {"? / help": "Displays help",
                 "-sip": "Source IPv4",
                 "-dp" : "Destination port",
                 "-sp" : "Source port",
-                "-dm" : "Destination mac",
-                "-sm" : "Sourcemac",
+                "-dm" : "Destination MAC",
+                "-sm" : "Source MAC",
                 "-f" : "Flags",
                 "-np" : "Number of packets",
                 "-pl" : "Payload",
@@ -86,7 +86,7 @@ def parse_cli():
     while True:
         user_input = get_user_input()
         if not user_input:
-            continue
+            continue   
         
         input_translated = {}
         tokens = []
@@ -109,7 +109,7 @@ def parse_cli():
                 tokens.append(part)
                 
         if quotes:
-            print("  Error: unclosed quotes in input")
+            print("  Error: Unclosed quotes in input")
             continue
         
         index = 0
@@ -132,7 +132,7 @@ def parse_cli():
                 except IndexError:
                     print(f"  Error: Missing value for {command}")
                     break
-                
+                        
             else:
                 print(f"  Error: Unknown command: {command}")
                 break
@@ -184,28 +184,45 @@ def translate_to_pkt(translated_data):
             try:
                 translated_data[field] = int(translated_data[field])
             except ValueError:
-                print(f"  Invalid integer for {field}")
+                print(f"  Error: Invalid integer for {field}")
                 return
     
     try:
         pkt = Packet(**translated_data)
-        print(f"  {pkt.protocol.upper()} packet created")
+        print(f"  {pkt.protocol.upper()} packet(s) created")
         command_pkt(pkt)
     except Exception as e:
         print(e)
         
 def command_pkt(packet : Packet):
-    command = input("Enter packet command >> ").lower()
+    attempts = 0
     
-    if command == "--s":
-        print(f"  {packet.protocol.upper()} packet sent successfully")
-        packet.send_packet()
-    elif command == "--sr":
-        print(f"  {packet.protocol.upper()} packet sent successfully. Waiting for response...")
-        time.sleep(2)
-        packet.send_receive_packet()
+    while attempts < 3:
+        command = input("Enter packet command >> ").lower()
+        
+        if command == "--s":
+            print(f"  {packet.protocol.upper()} packet(s) sent successfully")
+            packet.send_packet()
+        elif command == "--sr":
+            print(f"  {packet.protocol.upper()} packet(s) sent successfully. Waiting for response...")
+            
+            start_time = time.time()
+            packet.send_receive_packet()
+            end_time = time.time()
+            
+            elapsed_ms = (end_time - start_time) * 1000
+            print(f"  Response time: {elapsed_ms:.2f} ms")
+        elif command in ("help", "?"):
+            print("  --s / --sr")
+        elif command == "exit":
+            break
+        else:
+            if attempts + 1 < 3:
+                print("  Error: Invalid command")
+            attempts += 1
+            
     else:
-        print("  Error: invalid command. Deleting packet...")
+        print("  Error: Maximum attempts reached. Deleting packet...")
     
 def main():
     while True:

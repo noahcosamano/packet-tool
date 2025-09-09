@@ -1,10 +1,11 @@
 from scapy.all import TCP, sr1, srp1, send, sendp, IP, UDP, Ether, ICMP, Raw, ARP
-import ipaddress, re, sqlite3, hashlib
+import ipaddress, re, sqlite3, hashlib, nmap
 from datetime import datetime
 
 VALID_MAC = re.compile(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
 VALID_TCP_FLAGS = {"f", "s", "r", "p", "a", "u"}
 VALID_PROTOCOLS = {"TCP", "ICMP", "UDP", "ARP"}
+scanner = nmap.PortScanner()
 
 def validate_ip(ip: str) -> str:
     try:
@@ -16,10 +17,10 @@ def validate_ip(ip: str) -> str:
 def validate_mac(mac: str, protocol: str | None = None, arp_op: int | None = None) -> str:
     if mac is not None and (protocol == "arp") and arp_op == 1:
         raise ValueError("  Error: ARP op #1 does not support destination MAC")
-    if not isinstance(mac, str):
+    
+    elif not isinstance(mac, str) or not VALID_MAC.match(mac):
         raise ValueError(f"  Error: Invalid MAC address: {mac}")
-    if not VALID_MAC.match(mac):
-        raise ValueError(f"  Error: Invalid MAC address: {mac}")
+    
     return mac
 
 def validate_port(port: int, protocol: str) -> int:
@@ -87,7 +88,7 @@ class Packet:
         if not protocol:
             raise ValueError("  Error: Protocol required")
         
-        if not dst_port and protocol not in ("arp", "icmp"):
+        if (not dst_port and protocol in ("tcp", "udp")):
             raise ValueError("  Error: Destination port required for TCP and UDP")
         
         protocol = protocol.lower() # Sets protocol to lower case to verify
@@ -182,13 +183,18 @@ class Packet:
         pkt = self.create_packet()
         
         for _ in range(self.num_pkts):
+            
             if self.dst_mac or self.src_mac:
                 response = srp1(pkt, timeout=3, verbose=0)
             else:
                 response = sr1(pkt, timeout=3, verbose=0)
                 
-            print(f"  Received: {response.summary() if response else 'No response'}")
             log_packet(self, response_summary=response.summary() if response else "  No response")
+            
+            if response:
+                print(f"  Received: {response.summary()}")
+            else:
+                print("  No response")
             
         return response
     
