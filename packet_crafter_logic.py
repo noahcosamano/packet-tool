@@ -12,14 +12,14 @@ def validate_ip(ip: str) -> str:
         ipaddress.IPv4Address(ip)
         return ip
     except ValueError:
-        raise ValueError(f"  Error: Invalid IP address: {ip}")
+        raise ValueError(f"\tError: Invalid IP address: {ip}")
     
 def validate_mac(mac: str, protocol: str | None = None, arp_op: int | None = None) -> str:
     if mac is not None and (protocol == "arp") and arp_op == 1:
-        raise ValueError("  Error: ARP op #1 does not support destination MAC")
+        raise ValueError("\tError: ARP op #1 does not support destination MAC")
     
     elif not isinstance(mac, str) or not VALID_MAC.match(mac):
-        raise ValueError(f"  Error: Invalid MAC address: {mac}")
+        raise ValueError(f"\tError: Invalid MAC address: {mac}")
     
     return mac
 
@@ -27,35 +27,35 @@ def validate_port(port: int, protocol: str) -> int:
     try:
         port = int(port)
     except Exception as e:
-        raise ValueError(f"  Invalid port: {port}")
+        raise ValueError(f"\tError: Invalid port: {port}")
     if port is not None and (protocol.lower() in ("arp","icmp")):
-        raise ValueError(f"  Error: {protocol.upper()} does not support ports")
+        raise ValueError(f"\tError: {protocol.upper()} does not support ports")
     if not (1 <= port <= 65535):
-        raise ValueError(f"  Error: Invalid port: {port}")
+        raise ValueError(f"\tError: Invalid port: {port}")
     return port
 
 def validate_tcp_flags(flags: list | str | None, protocol: str) -> list[str] | None:
     if flags is not None and protocol.lower() != "tcp":
-        raise ValueError(f"  Error: {protocol.upper()} does not support flags")
+        raise ValueError(f"\tError: {protocol.upper()} does not support flags")
     elif not isinstance(flags, (str, list)):
-        raise ValueError(f"  Error: Invalid TCP flags: {flags}")
+        raise ValueError(f"\tError: Invalid TCP flags: {flags}")
     flag_list = list(flags) if isinstance(flags, str) else flags
     for flag in flag_list:
         if flag.lower() not in VALID_TCP_FLAGS:
-            raise ValueError(f"  Error: Invalid TCP flag: {flag}")
+            raise ValueError(f"\tError: Invalid TCP flag: {flag}")
     return flag_list
 
 def validate_protocol(protocol: str) -> str:
     if protocol.upper() not in VALID_PROTOCOLS:
-        raise ValueError(f"  Error: Invalid protocol: {protocol}")
+        raise ValueError(f"\tError: Invalid protocol: {protocol}")
     return protocol.lower()
 
 def validate_arp_op(arp_op: int | None, protocol: str) -> int | None:
     if protocol == "arp":
         if int(arp_op) < 1 or int(arp_op) > 2:
-            raise ValueError("  Error: ARP operator must be 1 or 2")
+            raise ValueError("\tError: ARP operator must be 1 or 2")
         return arp_op
-    raise ValueError("  Error: only ARP supports ARP operators")
+    raise ValueError("\tError: only ARP supports ARP operators")
     
 def validate_payload(payload) -> str | None:
     if payload:
@@ -63,16 +63,16 @@ def validate_payload(payload) -> str | None:
             payload = str(payload)
             return payload
         except Exception:
-            raise ValueError("  Error: Invalid payload")
+            raise ValueError("\tError: Invalid payload")
         
 def validate_num_pkts(num_pkts: int) -> int:
     try: 
         num_pkts = int(num_pkts)
         if not (500 >= num_pkts >= 1):
-            raise ValueError("  Error: Number of packets must be between 1 and 500")
+            raise ValueError("\tError: Number of packets must be between 1 and 500")
         return num_pkts
     except Exception:
-        raise ValueError(f"  Error: Invalid number of packets: {num_pkts}")
+        raise ValueError(f"\tError: Invalid number of packets: {num_pkts}")
     
 class Packet:
     __slots__ = ["dst_ip", "dst_mac", "protocol", "dst_port", "flags", "src_port", "src_ip", "src_mac",
@@ -83,15 +83,15 @@ class Packet:
                  src_mac: str = None, payload: str = None, num_pkts: int = 1, arp_op: int = 1):
         
         if not dst_ip:
-            raise ValueError("  Error: Destination IP required")
+            raise ValueError("\tError: Destination IP required")
         
         if not protocol:
-            raise ValueError("  Error: Protocol required")
+            raise ValueError("\tError: Protocol required")
         
         if (not dst_port and protocol in ("tcp", "udp")):
-            raise ValueError("  Error: Destination port required for TCP and UDP")
+            raise ValueError("\tError: Destination port required for TCP and UDP")
         
-        protocol = protocol.lower() # Sets protocol to lower case to verify
+        protocol = protocol # Sets protocol to lower case to verify
         self.protocol = protocol
         
         self.dst_ip = validate_ip(dst_ip) if dst_ip else None
@@ -107,36 +107,36 @@ class Packet:
             if protocol == "tcp":
                 self.flags = validate_tcp_flags(flags, protocol)
             else:
-                raise ValueError(f"  Error: {protocol.upper()} does not support flags")
+                raise ValueError(f"\tError: {protocol.upper()} does not support flags")
         else:
             self.flags = flags
         
         if protocol == "arp":
             if payload:
-                raise ValueError("  Error: ARP does not support payloads")
+                raise ValueError("\tError: ARP does not support payloads")
             if flags:
-                raise ValueError("  Error: ARP does not support flags")
+                raise ValueError("\tError: ARP does not support flags")
             if not (src_ip and src_mac and dst_ip):
-                raise ValueError("  Error: ARP requires source IP, source MAC, and destination IP")
+                raise ValueError("\tError: ARP requires source IP, source MAC, and destination IP")
             
             self.arp_op = validate_arp_op(arp_op, protocol)
             
             if arp_op == 1:
                 if dst_mac is not None:
-                    raise ValueError("  Error: ARP op #1 does not support destination MAC")
+                    raise ValueError("\tError: ARP op #1 does not support destination MAC")
                 self.dst_mac = "ff:ff:ff:ff:ff:ff"
             elif arp_op == 2 and not self.dst_mac:
-                raise ValueError("  Error: ARP replies require destination MAC")
+                raise ValueError("\tError: ARP replies require destination MAC")
             elif arp_op not in [1, 2]:
-                raise ValueError("  Error: Invalid ARP operator")
+                raise ValueError("\tError: Invalid ARP operator")
             
         else: 
             self.arp_op = None
 
         if protocol in ("tcp", "udp") and not dst_port:
-            raise ValueError(f"  Error: {protocol.upper()} requires a destination port")
+            raise ValueError(f"\tError: {protocol.upper()} requires a destination port")
         if protocol not in ("tcp", "udp", "icmp", "arp"):
-            raise ValueError("  Error: Unsupported protocol")
+            raise ValueError("\tError: Unsupported protocol")
             
     def create_packet(self):        
         ether = Ether() # Creates ethernet layer for link layer
@@ -189,20 +189,20 @@ class Packet:
             else:
                 response = sr1(pkt, timeout=3, verbose=0)
                 
-            log_packet(self, response_summary=response.summary() if response else "  No response")
+            log_packet(self, response_summary=response.summary() if response else "\tNo response")
             
             if response:
-                print(f"  Received: {response.summary()}")
+                print(f"\tReceived: {response.summary()}")
             else:
-                print("  No response")
+                print("\tNo response")
             
         return response
     
     def __str__(self):
         return (
-            f"  Protocol: {self.protocol.upper()}, DST IP: {self.dst_ip}, DST MAC: {self.dst_mac}, "
-            f"  DST Port: {self.dst_port}, SRC IP: {self.src_ip}, SRC MAC: {self.src_mac}, "
-            f"  SRC Port: {self.src_port}, Flags: {self.flags}, Payload: {self.payload}, Packets: {self.num_pkts}"
+            f"\tProtocol: {self.protocol.upper()}, DST IP: {self.dst_ip}, DST MAC: {self.dst_mac}, "
+            f"\tDST Port: {self.dst_port}, SRC IP: {self.src_ip}, SRC MAC: {self.src_mac}, "
+            f"\tSRC Port: {self.src_port}, Flags: {self.flags}, Payload: {self.payload}, Packets: {self.num_pkts}"
         )
       
 def hash_data(data:str) -> str: # Takes MAC and IPv4 addresses and hashes using SHA256 if anonymize mode is set to True

@@ -48,7 +48,7 @@ ALL_COMMANDS = {"? / help": "Displays all commands",
       
 def get_user_input():
     while True:
-        user_input = input(">> ").lower() 
+        user_input = input(">> ").strip().lower() 
         
         if user_input in ("help","?"):
             for command, meaning in ALL_COMMANDS.items():
@@ -66,20 +66,20 @@ def flag_help(flag):
             for protocol in VALID_PROTOCOLS:
                 print(f"  {protocol}")
         case "-dip" | "-sip":
-            print("  x.x.x.x, x = 1-255, (eg. 192.168.52.3)")
+            print("\tx.x.x.x, x = 1-255, (eg. 192.168.52.3)")
         case "-dp" | "-sp":
-            print("  1-65535")
+            print("\t1-65535")
         case "-dm" | "-sm":
-            print("  x:x:x:x:x:x, x = 1-9 a-F, (eg. a5:6e:f0:b3:e8:98)")
+            print("\tx:x:x:x:x:x, x = 1-9 a-F, (eg. a5:6e:f0:b3:e8:98)")
         case "-f":
             for flag in VALID_TCP_FLAGS:
                 print(f"  {flag}")
         case "-np":
-            print("  1-500")
+            print("\t1-500")
         case "-pl":
-            print("  any text")
+            print("\tany text")
         case "-op":
-            print("  1 or 2")
+            print("\t1 or 2")
             
         
 def parse_cli():
@@ -109,7 +109,7 @@ def parse_cli():
                 tokens.append(part)
                 
         if quotes:
-            print("  Error: Unclosed quotes in input")
+            print("\tError: Unclosed quotes in input")
             continue
         
         index = 0
@@ -120,7 +120,7 @@ def parse_cli():
                 try:
                     value = tokens[index + 1]
                     if value.startswith("-") and value in translation:
-                        print(f"  Error: Missing value for {command}")
+                        print(f"\tError: Missing value for {command}")
                         break
                     
                     elif value == "?":
@@ -130,11 +130,11 @@ def parse_cli():
                     input_translated[translation[command]] = value
                     index += 2
                 except IndexError:
-                    print(f"  Error: Missing value for {command}")
+                    print(f"\tError: Missing value for {command}")
                     break
                         
             else:
-                print(f"  Error: Unknown command: {command}")
+                print(f"\tError: Unknown command: {command}")
                 break
         else:
             return input_translated
@@ -150,15 +150,15 @@ def verify_field(translated_data: dict):
                     validate_ip(key)
                 case "dst_mac" | "src_mac":
                     if protocol == None:
-                        raise ValueError("  Error: Protocol required")
+                        raise ValueError("\tError: Protocol required")
                     validate_mac(key, protocol)
                 case "flags":
                     if protocol == None:
-                        raise ValueError("  Error: Protocol required")
+                        raise ValueError("\tError: Protocol required")
                     validate_tcp_flags(key, protocol)
                 case "dst_port" | "src_port":
                     if protocol == None:
-                        raise ValueError("  Error: Protocol required")
+                        raise ValueError("\tError: Protocol required")
                     validate_port(key, protocol)
                 case "num_pkts":
                     validate_num_pkts(key)
@@ -173,8 +173,6 @@ def verify_field(translated_data: dict):
         return False
 
 def translate_to_pkt(translated_data):
-    global PACKET
-    
     if not verify_field(translated_data):
         return False
     
@@ -184,12 +182,12 @@ def translate_to_pkt(translated_data):
             try:
                 translated_data[field] = int(translated_data[field])
             except ValueError:
-                print(f"  Error: Invalid integer for {field}")
+                print(f"\tError: Invalid integer for {field}")
                 return
     
     try:
         pkt = Packet(**translated_data)
-        print(f"  {pkt.protocol.upper()} packet(s) created")
+        print(f"\t{pkt.protocol.upper()} packet(s) created")
         command_pkt(pkt)
     except Exception as e:
         print(e)
@@ -198,31 +196,33 @@ def command_pkt(packet : Packet):
     attempts = 0
     
     while attempts < 3:
-        command = input("Enter packet command >> ").lower()
+        command = input("Enter packet command >> ").strip().lower()
         
         if command == "--s":
-            print(f"  {packet.protocol.upper()} packet(s) sent successfully")
+            print(f"\t{packet.protocol.upper()} packet(s) sent successfully")
             packet.send_packet()
+            break
         elif command == "--sr":
-            print(f"  {packet.protocol.upper()} packet(s) sent successfully. Waiting for response...")
+            print(f"\t{packet.protocol.upper()} packet(s) sent successfully. Waiting for response...")
             
             start_time = time.time()
             packet.send_receive_packet()
             end_time = time.time()
             
             elapsed_ms = (end_time - start_time) * 1000
-            print(f"  Response time: {elapsed_ms:.2f} ms")
+            print(f"\tResponse time: {elapsed_ms:.2f} ms")
+            break
         elif command in ("help", "?"):
-            print("  --s / --sr")
+            print("\t--s / --sr")
         elif command == "exit":
             break
         else:
             if attempts + 1 < 3:
-                print("  Error: Invalid command")
+                print("\tError: Invalid command")
             attempts += 1
             
     else:
-        print("  Error: Maximum attempts reached. Deleting packet...")
+        print("\tError: Maximum attempts reached. Deleting packet...")
     
 def main():
     while True:
