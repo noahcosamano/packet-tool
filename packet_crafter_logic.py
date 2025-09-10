@@ -1,9 +1,20 @@
+"""
+This program is the logical file for the main command line interface file.
+Please see "packet_crafter_CLI.py" for full program.
+
+Author: Noah Cosamano
+"""
+
 import ipaddress
 import re
 import sqlite3
 import hashlib
 from datetime import datetime
-from scapy.all import TCP, sr1, srp1, send, sendp, IP, UDP, Ether, ICMP, Raw, ARP
+from scapy.layers.inet import TCP, IP, UDP, ICMP
+from scapy.layers.l2 import Ether, ARP
+from scapy.packet import Raw
+from scapy.sendrecv import send, sendp, sr1, srp1
+
 
 VALID_MAC = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 VALID_TCP_FLAGS = {"f", "s", "r", "p", "a", "u"}
@@ -11,6 +22,18 @@ VALID_PROTOCOLS = {"TCP", "ICMP", "UDP", "ARP"}
 
 
 def validate_ip(ip: str) -> str:
+    """
+    Validates an IPv4 address using the ipaddress module.
+
+    Args:
+        ip (str): IPv4 address to validate.
+
+    Raises:
+        ValueError: If IPv4 address is invalid.
+
+    Returns:
+        str: The validated IPv4 address.
+    """
     try:
         ipaddress.IPv4Address(ip)
         return ip
@@ -21,6 +44,22 @@ def validate_ip(ip: str) -> str:
 def validate_mac(
     mac: str, protocol: str | None = None, arp_op: int | None = None
 ) -> str:
+    """
+    Validates MAC address against ARP operator if given, and if it conforms to
+    standard MAC address format with isinstance and checking regular expression.
+
+    Args:
+        mac (str): MAC address to validate.
+        protocol (str | None: Protocol to check with. Defaults to None.
+        arp_op (int | None): ARP operator to check with. Defaults to None.
+
+    Raises:
+        ValueError: If MAC address is not string or not matching standard format.
+        ValueError: If protocol is ARP and ARP operator is 1.
+
+    Returns:
+        str: The validated MAC address
+    """
     if mac is not None and (protocol == "arp") and arp_op == 1:
         raise ValueError("\tError: ARP op #1 does not support destination MAC")
 
@@ -31,6 +70,21 @@ def validate_mac(
 
 
 def validate_port(port: int, protocol: str) -> int:
+    """
+    Validates a port number for a given protocol.
+
+    Args:
+        port (int): The port number to validate.
+        protocol (str): The protocol name (e.g., 'tcp', 'udp', 'arp', 'icmp').
+
+    Raises:
+        ValueError: If the port is not an integer.
+        ValueError: If the protocol does not support ports (e.g., ARP or ICMP).
+        ValueError: If the port number is outside the valid range (1-65535).
+
+    Returns:
+        int: The validated port number.
+    """
     try:
         port = int(port)
     except Exception:
@@ -43,6 +97,21 @@ def validate_port(port: int, protocol: str) -> int:
 
 
 def validate_tcp_flags(flags: list | str | None, protocol: str) -> list[str] | None:
+    """
+    Validates TCP flags for the given protocol.
+
+    Args:
+        flags (list | str | None): TCP flags as a list or string to validate.
+        protocol (str): Protocol name to check compatibility with TCP flags.
+
+    Raises:
+        ValueError: If the protocol does not support TCP flags.
+        ValueError: If flags are not a string or list.
+        ValueError: If any flag is not a valid TCP flag.
+
+    Returns:
+        list[str] | None: List of validated TCP flags or None if no flags provided.
+    """
     if flags is not None and protocol.lower() != "tcp":
         raise ValueError(f"\tError: {protocol.upper()} does not support flags")
     if not isinstance(flags, (str, list)):
@@ -55,12 +124,38 @@ def validate_tcp_flags(flags: list | str | None, protocol: str) -> list[str] | N
 
 
 def validate_protocol(protocol: str) -> str:
+    """
+    Validates if the given protocol is supported.
+
+    Args:
+        protocol (str): Protocol name to validate.
+
+    Raises:
+        ValueError: If the protocol is not in the list of valid protocols.
+
+    Returns:
+        str: The validated protocol in lowercase.
+    """
     if protocol.upper() not in VALID_PROTOCOLS:
         raise ValueError(f"\tError: Invalid protocol: {protocol}")
     return protocol.lower()
 
 
 def validate_arp_op(arp_op: int | None, protocol: str) -> int | None:
+    """
+    Validates the ARP operation code if the protocol is ARP.
+
+    Args:
+        arp_op (int | None): ARP operation code to validate.
+        protocol (str): Protocol name to check for ARP.
+
+    Raises:
+        ValueError: If protocol is not 'arp'.
+        ValueError: If arp_op is not 1 (request) or 2 (reply).
+
+    Returns:
+        int | None: The validated ARP operation code.
+    """
     if protocol == "arp":
         if int(arp_op) < 1 or int(arp_op) > 2:
             raise ValueError("\tError: ARP operator must be 1 or 2")
@@ -69,15 +164,40 @@ def validate_arp_op(arp_op: int | None, protocol: str) -> int | None:
 
 
 def validate_payload(payload) -> str | None:
+    """
+    Validates and converts the payload to a string if it exists.
+
+    Args:
+        payload: The payload data to validate.
+
+    Raises:
+        ValueError: If the payload cannot be converted to a string.
+
+    Returns:
+        str | None: The validated payload as a string, or None if no payload is provided.
+    """
     if payload:
         try:
             payload = str(payload)
             return payload
         except Exception:
             raise ValueError("\tError: Invalid payload")
+    return None
 
 
 def validate_num_pkts(num_pkts: int) -> int:
+    """
+    Validates that the number of packets is an integer between 1 and 500.
+
+    Args:
+        num_pkts (int): The number of packets to validate.
+
+    Raises:
+        ValueError: If `num_pkts` is not an integer or not within the valid range.
+
+    Returns:
+        int: The validated number of packets.
+    """
     try:
         num_pkts = int(num_pkts)
         if not 500 >= num_pkts >= 1:
@@ -88,6 +208,44 @@ def validate_num_pkts(num_pkts: int) -> int:
 
 
 class Packet:
+    """
+    Represents a network packet with attributes for various protocols and validation.
+
+    This class encapsulates all necessary fields for crafting network packets, including
+    IP addresses, MAC addresses, ports, protocol type, flags, payload, number of packets,
+    and ARP operation codes. It validates all inputs upon initialization to ensure correctness
+    and compatibility based on the specified protocol.
+
+    Attributes:
+        dst_ip (str): Destination IP address (required).
+        src_ip (str | None): Source IP address (optional).
+        dst_mac (str | None): Destination MAC address (optional).
+        src_mac (str | None): Source MAC address (optional).
+        protocol (str): Protocol type (e.g., 'tcp', 'udp', 'icmp', 'arp') (required).
+        dst_port (int | None): Destination port (required for TCP and UDP).
+        src_port (int | None): Source port (optional).
+        flags (list[str] | None): TCP flags (only supported if protocol is TCP).
+        payload (str | None): Payload data as string (not supported for ARP).
+        num_pkts (int): Number of packets to send (default is 1, between 1 and 500).
+        arp_op (int | None): ARP operation code (1 for request, 2 for reply) (only for ARP).
+
+    Raises:
+        ValueError: If required fields are missing or invalid, or if protocol-specific
+                    restrictions are violated.
+
+    Example:
+        >>> pkt = Packet(
+                dst_ip="192.168.1.1",
+                protocol="tcp",
+                dst_port=80,
+                flags="s",
+                src_ip="192.168.1.2",
+                src_port=12345,
+                payload="Hello",
+                num_pkts=5
+            )
+    """
+
     __slots__ = [
         "dst_ip",
         "dst_mac",
@@ -177,7 +335,26 @@ class Packet:
             raise ValueError("\tError: Unsupported protocol")
 
     def create_packet(self):
-        ether = Ether()  # Creates ethernet layer for link layer
+        """
+        Constructs and returns a Scapy packet based on the instance's attributes.
+
+        Supports ARP, TCP, UDP, and ICMP protocols. If MAC addresses are provided,
+        the packet is encapsulated within an Ethernet frame. If a payload is set,
+        it is added as a Raw layer.
+
+        Returns:
+            scapy.packet.Packet: The constructed packet ready for sending.
+
+        Raises:
+            None explicitly, but assumes all instance attributes are validated prior.
+
+        Notes:
+            - For ARP packets, sets operation, source and destination MAC/IP as needed.
+            - For TCP/UDP, sets source/destination ports and TCP flags if applicable.
+            - If no source IP is provided, the packet uses only the destination IP.
+        """
+
+        ether = Ether()
         payload = Raw(load=self.payload.encode()) if self.payload else None
 
         if self.protocol == "arp":
@@ -214,7 +391,17 @@ class Packet:
 
         return pkt / payload if payload else pkt
 
-    def send_packet(self):  # Sends one packet
+    def send_packet(self):
+        """
+        Sends the constructed packet multiple times based on the num_pkts attribute.
+
+        Uses `sendp` (layer 2) if either source or destination MAC address is specified,
+        otherwise uses `send` (layer 3). After sending each packet, logs the packet details.
+
+        Returns:
+            None
+        """
+
         pkt = self.create_packet()
 
         for _ in range(self.num_pkts):
@@ -225,9 +412,18 @@ class Packet:
 
             log_packet(self)
 
-    def send_receive_packet(
-        self,
-    ):  # Sends and receives one packet (same as above, except for srp1 and sr1)
+    def send_receive_packet(self):
+        """
+        Sends the constructed packet and waits for a single response for each packet sent.
+
+        Uses `srp1` (layer 2) if either source or destination MAC address is specified,
+        otherwise uses `sr1` (layer 3). Sends packets `num_pkts` times, logs each packet
+        and its response summary, and prints the response summary or a no-response message.
+
+        Returns:
+            The last response packet received, or None if no response was received.
+        """
+
         pkt = self.create_packet()
 
         for _ in range(self.num_pkts):
@@ -258,18 +454,31 @@ class Packet:
         )
 
 
-def hash_data(
-    data: str,
-) -> (
-    str
-):  # Takes MAC and IPv4 addresses and hashes using SHA256 if anonymize mode is set to True
+def hash_data(data: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-def log_packet(
-    packet: Packet, response_summary: str | None = None, anonymize=True
-):  # Creates a log of packets and responses if given one
-    conn = sqlite3.connect("packet_history.sqlite")  # seperate SQL db file
+def log_packet(packet: Packet, response_summary: str | None = None, anonymize=True):
+    """
+    Logs packet details and an optional response summary into a SQLite database.
+
+    Creates a table named 'packet_history' if it doesn't exist, then inserts
+    the packet's metadata along with an optional response summary. Optionally
+    anonymizes sensitive fields by hashing.
+
+    Args:
+        packet (Packet): The packet object containing attributes like IPs, MACs,
+                         protocol, ports, flags, payload, and ARP operation.
+        response_summary (str | None, optional): An optional summary or response
+                         related to the packet to be logged. Defaults to None.
+        anonymize (bool, optional): Whether to anonymize sensitive data fields
+                         (IP addresses, MAC addresses, payload) by hashing.
+                         Defaults to True.
+
+    Returns:
+        None
+    """
+    conn = sqlite3.connect("packet_history.sqlite")
     c = conn.cursor()
 
     c.execute(
@@ -291,11 +500,10 @@ def log_packet(
         )
     """
     )
-    # ^ Creates a new table if one is not made already in file. Contains all information of packet.
 
     dst_ip = (
         hash_data(packet.dst_ip) if (packet.dst_ip and anonymize) else packet.dst_ip
-    )  # Hashes sensitive data
+    )
     src_ip = (
         hash_data(packet.src_ip) if (packet.src_ip and anonymize) else packet.src_ip
     )
@@ -318,7 +526,7 @@ def log_packet(
 
     """,
         (
-            datetime.now().isoformat(),  # Logs date and time of packet
+            datetime.now().isoformat(),
             dst_ip,
             src_ip,
             dst_mac,
@@ -333,5 +541,5 @@ def log_packet(
         ),
     )
 
-    conn.commit()  # Pushes changes to SQL file
+    conn.commit()
     conn.close()
