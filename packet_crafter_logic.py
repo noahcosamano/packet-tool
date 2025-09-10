@@ -1,11 +1,13 @@
-from scapy.all import TCP, sr1, srp1, send, sendp, IP, UDP, Ether, ICMP, Raw, ARP
-import ipaddress, re, sqlite3, hashlib, nmap
+import ipaddress
+import re
+import sqlite3
+import hashlib
 from datetime import datetime
+from scapy.all import TCP, sr1, srp1, send, sendp, IP, UDP, Ether, ICMP, Raw, ARP
 
 VALID_MAC = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 VALID_TCP_FLAGS = {"f", "s", "r", "p", "a", "u"}
 VALID_PROTOCOLS = {"TCP", "ICMP", "UDP", "ARP"}
-scanner = nmap.PortScanner()
 
 
 def validate_ip(ip: str) -> str:
@@ -22,7 +24,7 @@ def validate_mac(
     if mac is not None and (protocol == "arp") and arp_op == 1:
         raise ValueError("\tError: ARP op #1 does not support destination MAC")
 
-    elif not isinstance(mac, str) or not VALID_MAC.match(mac):
+    if not isinstance(mac, str) or not VALID_MAC.match(mac):
         raise ValueError(f"\tError: Invalid MAC address: {mac}")
 
     return mac
@@ -31,11 +33,11 @@ def validate_mac(
 def validate_port(port: int, protocol: str) -> int:
     try:
         port = int(port)
-    except Exception as e:
+    except Exception:
         raise ValueError(f"\tError: Invalid port: {port}")
     if port is not None and (protocol.lower() in ("arp", "icmp")):
         raise ValueError(f"\tError: {protocol.upper()} does not support ports")
-    if not (1 <= port <= 65535):
+    if not 1 <= port <= 65535:
         raise ValueError(f"\tError: Invalid port: {port}")
     return port
 
@@ -43,7 +45,7 @@ def validate_port(port: int, protocol: str) -> int:
 def validate_tcp_flags(flags: list | str | None, protocol: str) -> list[str] | None:
     if flags is not None and protocol.lower() != "tcp":
         raise ValueError(f"\tError: {protocol.upper()} does not support flags")
-    elif not isinstance(flags, (str, list)):
+    if not isinstance(flags, (str, list)):
         raise ValueError(f"\tError: Invalid TCP flags: {flags}")
     flag_list = list(flags) if isinstance(flags, str) else flags
     for flag in flag_list:
@@ -78,7 +80,7 @@ def validate_payload(payload) -> str | None:
 def validate_num_pkts(num_pkts: int) -> int:
     try:
         num_pkts = int(num_pkts)
-        if not (500 >= num_pkts >= 1):
+        if not 500 >= num_pkts >= 1:
             raise ValueError("\tError: Number of packets must be between 1 and 500")
         return num_pkts
     except Exception:
@@ -124,8 +126,7 @@ class Packet:
         if not dst_port and protocol in ("tcp", "udp"):
             raise ValueError("\tError: Destination port required for TCP and UDP")
 
-        protocol = protocol  # Sets protocol to lower case to verify
-        self.protocol = protocol
+        self.protocol = protocol.lower()
 
         self.dst_ip = validate_ip(dst_ip) if dst_ip else None
         self.src_ip = validate_ip(src_ip) if src_ip else None
@@ -252,7 +253,8 @@ class Packet:
         return (
             f"\tProtocol: {self.protocol.upper()}, DST IP: {self.dst_ip}, DST MAC: {self.dst_mac}, "
             f"\tDST Port: {self.dst_port}, SRC IP: {self.src_ip}, SRC MAC: {self.src_mac}, "
-            f"\tSRC Port: {self.src_port}, Flags: {self.flags}, Payload: {self.payload}, Packets: {self.num_pkts}"
+            f"\tSRC Port: {self.src_port}, Flags: {self.flags}, Payload: {self.payload}, Packets: "
+            f"{self.num_pkts}"
         )
 
 
