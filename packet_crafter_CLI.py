@@ -8,16 +8,16 @@ a prompt that allows users to create and send packets at the command line using 
 program allows sending a capped number of packets at once with a specified destination MAC address for Layer
 2 traffic, as well as destination IPv4 addresses for Layer 3 traffic. It also supports crafting packets with
 payloads, spoofed source IPv4 addresses, source ports, and MAC addresses. All packet information and responses
-sent through this tool will also be logged into a seperate SQL database with hashed IPv4 addresses, MAC
+sent through this tool will also be logged into a separate SQL database with hashed IPv4 addresses, MAC
 addresses, and payloads.
 
 Author: Noah Cosamano
 """
 
-from field_validation import *
-from packet_logic import create_packet, send_packet, send_receive_packet
 import time
 import sys
+from field_validation import *
+from packet_logic import create_packet, send_packet, send_receive_packet
 
 COMMAND_TO_FIELD = {
     "-p": "protocol",
@@ -54,6 +54,12 @@ COMMAND_TO_USE = {
 
 
 def get_user_input_lower():
+    """
+    Handles user input from the CLI, showing help or exiting if needed.
+
+    Returns:
+        str: The user's input in lowercase, unless it's a special command.
+    """
     while True:
         user_input_lower = input(">> ").strip().lower()
 
@@ -69,6 +75,12 @@ def get_user_input_lower():
 
 
 def command_helper(command):
+    """
+    Displays usage information for a specific CLI command.
+
+    Args:
+        command (str): CLI command flag (e.g. "-p", "-f").
+    """
     match command:
         case "-p":
             for protocol in VALID_PROTOCOLS:
@@ -91,6 +103,12 @@ def command_helper(command):
 
 
 def parse_cli():
+    """
+    Parses the user's CLI input into structured field values.
+
+    Returns:
+        dict: A dictionary of field values derived from user input.
+    """
     while True:
         user_input_lower = get_user_input_lower()
         if not user_input_lower:
@@ -134,7 +152,7 @@ def parse_cli():
                         print(f" Error: Missing value for {command}")
                         break
 
-                    elif command_value == "?":
+                    if command_value == "?":
                         command_helper(command)
                         break
 
@@ -152,6 +170,15 @@ def parse_cli():
 
 
 def verify_field_values(field_values: dict):
+    """
+    Validates the parsed CLI field values.
+
+    Args:
+        field_values (dict): Dictionary of user-entered packet fields.
+
+    Returns:
+        bool: True if all fields are valid, False otherwise.
+    """
     if "protocol" not in field_values:
         print(" Error: Protocol required")
         return False
@@ -186,6 +213,13 @@ def verify_field_values(field_values: dict):
 
 
 def command_packet(packet, field_values):
+    """
+    Prompts the user to send the packet (with or without waiting for a reply).
+
+    Args:
+        packet: The scapy packet object to send.
+        field_values (dict): The associated field values used to create the packet.
+    """
     attempts = 0
 
     while attempts < 3:
@@ -194,8 +228,8 @@ def command_packet(packet, field_values):
         if packet_command == "--s":
             send_packet(packet, field_values)
             break
-        elif packet_command == "--sr":
-            print(f" packet(s) sent successfully. Waiting for response...")
+        if packet_command == "--sr":
+            print(" packet(s) sent successfully. Waiting for response...")
 
             start_time = time.time()
             send_receive_packet(packet, field_values)
@@ -218,6 +252,10 @@ def command_packet(packet, field_values):
 
 
 def main():
+    """
+    Main program loop. Continuously parses user input, validates it,
+    creates the packet, and handles the send/send+reply interaction.
+    """
     while True:
         field_values = parse_cli()
         if verify_field_values(field_values) is True:

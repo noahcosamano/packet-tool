@@ -4,14 +4,26 @@ from datetime import datetime
 from scapy.layers.inet import TCP, IP, UDP, ICMP
 from scapy.layers.l2 import Ether, ARP
 from scapy.packet import Raw
+from scapy.sendrecv import send, sendp, sr1, srp1
 from packet_classes.icmp_packet_class import ICMP_Packet
 from packet_classes.arp_packet_class import ARP_Packet
 from packet_classes.tcp_packet_class import TCP_Packet
 from packet_classes.udp_packet_class import UDP_Packet
-from scapy.sendrecv import send, sendp, sr1, srp1
 
 
 def create_base_packet(field_values: dict):
+    """
+    Creates the base packet object based on protocol and required fields.
+
+    Args:
+        field_values (dict): Dictionary containing user-specified fields.
+
+    Raises:
+        ValueError: If required fields are missing or protocol is unsupported.
+
+    Returns:
+        Packet object corresponding to the protocol (TCP_Packet, UDP_Packet, ICMP_Packet, or ARP_Packet).
+    """
     if "protocol" not in field_values:
         raise ValueError(" Error: Protocol is required")
     protocol = field_values["protocol"]
@@ -37,6 +49,19 @@ def create_base_packet(field_values: dict):
 
 
 def create_packet(field_values: dict):
+    """
+    Constructs a full packet including Ethernet, IP, Layer 4, and payload layers,
+    based on the provided field values.
+
+    Args:
+        field_values (dict): Dictionary containing packet fields and options.
+
+    Returns:
+        Scapy Packet object ready for sending.
+
+    Raises:
+        ValueError: On missing fields or unsupported protocols.
+    """
     try:
         packet = create_base_packet(field_values)
     except Exception as e:
@@ -103,6 +128,13 @@ def create_packet(field_values: dict):
 
 
 def send_packet(packet, field_values: dict):
+    """
+    Sends the constructed packet multiple times as specified in 'num_pkts'.
+
+    Args:
+        packet: Scapy packet object to be sent.
+        field_values (dict): Dictionary containing user-specified fields including number of packets.
+    """
     num_pkts = int(field_values.get("num_pkts") or 1)
     for _ in range(num_pkts):
 
@@ -117,6 +149,16 @@ def send_packet(packet, field_values: dict):
 
 
 def send_receive_packet(packet, field_values: dict):
+    """
+    Sends the packet and waits for a response, optionally sending multiple packets.
+
+    Args:
+        packet: Scapy packet object to be sent.
+        field_values (dict): Dictionary containing user-specified fields including number of packets.
+
+    Returns:
+        Response packet if received, None otherwise.
+    """
     num_pkts = int(field_values.get("num_pkts") or 1)
     for _ in range(num_pkts):
 
@@ -147,9 +189,16 @@ def hash_data(data: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-def log_packet(
-    packet, field_values, response_summary: str | None = None, anonymize=True
-):
+def log_packet(field_values: dict, response_summary: str | None = None, anonymize=True):
+    """
+    Logs packet details and optionally anonymizes sensitive data before storing in SQLite DB.
+
+    Args:
+        packet: The sent packet object.
+        field_values (dict): Dictionary of packet field values.
+        response_summary (str | None): Summary of response packet or None.
+        anonymize (bool): Whether to hash sensitive information for privacy.
+    """
     conn = sqlite3.connect("packet_history.sqlite")
     c = conn.cursor()
 
