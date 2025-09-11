@@ -14,7 +14,8 @@ addresses, and payloads.
 Author: Noah Cosamano
 """
 
-from packet_crafter_logic import *
+from field_validation import *
+from packet_logic import create_packet, send_packet, send_receive_packet
 import time
 import sys
 
@@ -53,24 +54,6 @@ COMMAND_TO_USE = {
 
 
 def get_user_input_lower():
-    """
-    Prompts the user for input, processes it, and returns it in lowercase.
-
-    The function repeatedly prompts the user with ">> " until a valid command
-    (other than 'help', '?', or 'exit') is entered. It handles special commands:
-
-    - If the user inputs "help" or "?", it prints available commands and their usage
-      from the global COMMAND_TO_USE dictionary.
-    - If the user inputs "exit", the program terminates immediately.
-    - For any other input, the function returns the input converted to lowercase and stripped.
-
-    Returns:
-        str: The user's input, converted to lowercase and stripped of leading/trailing whitespace.
-
-    Raises:
-        SystemExit: When the user enters "exit".
-    """
-
     while True:
         user_input_lower = input(">> ").strip().lower()
 
@@ -86,76 +69,28 @@ def get_user_input_lower():
 
 
 def command_helper(command):
-    """
-    Prints usage information or valid values based on the given command option.
-
-    Args:
-        command (str): The command option string to provide help for.
-
-    Behavior:
-        - "-p": Prints all valid protocols.
-        - "-dip" or "-sip": Prints the format for IPv4 addresses.
-        - "-dp" or "-sp": Prints the valid port number range.
-        - "-dm" or "-sm": Prints the format for MAC addresses.
-        - "-f": Prints all valid TCP flags.
-        - "-np": Prints the valid range for the number of packets.
-        - "-pl": Prints information about valid payload format.
-        - "-op": Prints valid ARP operation codes.
-
-    Returns:
-        None
-    """
-
     match command:
         case "-p":
             for protocol in VALID_PROTOCOLS:
                 print(f"  {protocol}")
         case "-dip" | "-sip":
-            print("\tx.x.x.x, x = 1-255, (eg. 192.168.52.3)")
+            print(" x.x.x.x, x = 1-255, (eg. 192.168.52.3)")
         case "-dp" | "-sp":
-            print("\t1-65535")
+            print(" 1-65535")
         case "-dm" | "-sm":
-            print("\tx:x:x:x:x:x, x = 1-9 a-F, (eg. a5:6e:f0:b3:e8:98)")
+            print(" x:x:x:x:x:x, x = 1-9 a-F, (eg. a5:6e:f0:b3:e8:98)")
         case "-f":
             for flag in VALID_TCP_FLAGS:
-                print(f"  {flag}")
+                print(f" {flag}")
         case "-np":
-            print("\t1-500")
+            print(" 1-500")
         case "-pl":
-            print("\tany text")
+            print(" any text")
         case "-op":
-            print("\t1 or 2")
+            print(" 1 or 2")
 
 
 def parse_cli():
-    """
-    Parses user input from the command line into a dictionary of field values.
-
-    This function continuously prompts the user for input, processes the input
-    to handle quoted strings as single tokens, and then interprets tokens as
-    command-value pairs based on predefined mappings (`COMMAND_TO_FIELD`).
-
-    Features:
-    - Supports multi-word values enclosed in double quotes.
-    - Detects unclosed quotes and prompts an error without terminating.
-    - Checks for missing values after commands and prints an error.
-    - Supports a help mechanism: entering "?" after a command triggers
-      `command_helper` to display usage information for that command.
-    - Validates commands against a known set of commands, printing an error
-      for unknown commands.
-    - Returns a dictionary mapping field names to their corresponding values
-      once a valid input line is parsed.
-
-    Returns:
-        dict: A dictionary of parsed field names and their values.
-
-    Prints:
-        Error messages for:
-            - Unclosed quotes in the input.
-            - Missing values for commands.
-            - Unknown commands.
-    """
-
     while True:
         user_input_lower = get_user_input_lower()
         if not user_input_lower:
@@ -182,7 +117,7 @@ def parse_cli():
                 input_tokens.append(input_part)
 
         if in_quotes:
-            print("\tError: Unclosed quotes in input")
+            print(" Error: Unclosed quotes in input")
             continue
 
         token_index = 0
@@ -196,7 +131,7 @@ def parse_cli():
                         command_value.startswith("-")
                         and command_value in COMMAND_TO_FIELD
                     ):
-                        print(f"\tError: Missing value for {command}")
+                        print(f" Error: Missing value for {command}")
                         break
 
                     elif command_value == "?":
@@ -206,37 +141,19 @@ def parse_cli():
                     field_values[COMMAND_TO_FIELD[command]] = command_value
                     token_index += 2
                 except IndexError:
-                    print(f"\tError: Missing value for {command}")
+                    print(f" Error: Missing value for {command}")
                     break
 
             else:
-                print(f"\tError: Unknown command: {command}")
+                print(f" Error: Unknown command: {command}")
                 break
         else:
             return field_values
 
 
 def verify_field_values(field_values: dict):
-    """
-    Validates a dictionary of field values for correctness based on the specified protocol.
-
-    Args:
-        field_values (dict): A dictionary containing field names as keys and their
-                             corresponding values as values (e.g., 'protocol', 'dst_ip').
-
-    Returns:
-        bool: True if all provided fields are valid according to their validators,
-              False if any validation fails or required fields are missing.
-
-    Behavior:
-        - Checks that the 'protocol' field is present and valid.
-        - Validates IP addresses, MAC addresses, TCP flags, ports, number of packets,
-          ARP operation codes, and payloads based on the protocol.
-        - Prints an error message if any validation fails.
-    """
-
     if "protocol" not in field_values:
-        print("\tError: Protocol required")
+        print(" Error: Protocol required")
         return False
 
     try:
@@ -268,104 +185,46 @@ def verify_field_values(field_values: dict):
         return False
 
 
-def create_packet(field_values):
-    """
-    Validates field values, converts necessary fields to integers,
-    creates a Packet object, and sends the packet.
-
-    Args:
-        field_values (dict): Dictionary containing packet fields and their string values.
-
-    Returns:
-        bool or None:
-            - Returns False if validation fails or if integer conversion fails.
-            - Returns None if the packet is created and sent successfully.
-
-    Side Effects:
-        Prints error messages for validation or conversion failures,
-        prints confirmation when a packet is created,
-        and sends the created packet via command_packet().
-    """
-
-    if not verify_field_values(field_values):
-        return False
-
-    int_fields = ["dst_port", "src_port", "num_pkts", "arp_op"]
-
-    for field in int_fields:
-        if field in field_values:
-            try:
-                field_values[field] = int(field_values[field])
-            except ValueError:
-                print(f"\tError: Invalid integer for {field}")
-                return
-
-    try:
-        packet = Packet(**field_values)
-        print(f"\t{packet.protocol.upper()} packet(s) created")
-        command_packet(packet)
-    except Exception as e:
-        print(e)
-
-
-def command_packet(packet: Packet):
-    """
-    Interactively handles user commands to send or send-and-receive a packet,
-    allowing up to three attempts for valid input.
-
-    Args:
-        packet (Packet): The packet object to be sent or sent-and-received.
-
-    Behavior:
-        - Prompts the user to enter a command:
-            -- "--s"   : Sends the packet and confirms success.
-            -- "--sr"  : Sends the packet, waits for a response,
-                         then prints the response time in milliseconds.
-            -- "help" or "?" : Displays available commands.
-            -- "exit" : Exits without sending.
-        - Allows up to three invalid attempts before aborting and deleting the packet.
-        - Prints error messages for invalid commands and success messages for sending.
-    """
-
+def command_packet(packet, field_values):
     attempts = 0
 
     while attempts < 3:
         packet_command = input("Enter packet command >> ").strip().lower()
 
         if packet_command == "--s":
-            print(f"\t{packet.protocol.upper()} packet(s) sent successfully")
-
-            packet.send_packet()
+            send_packet(packet, field_values)
             break
         elif packet_command == "--sr":
-            print(
-                f"\t{packet.protocol.upper()} packet(s) sent successfully. Waiting for response..."
-            )
+            print(f" packet(s) sent successfully. Waiting for response...")
 
             start_time = time.time()
-            packet.send_receive_packet()
+            send_receive_packet(packet, field_values)
             end_time = time.time()
 
             elapsed_ms = (end_time - start_time) * 1000
-            print(f"\tResponse time: {elapsed_ms:.2f} ms")
+            print(f" Response time: {elapsed_ms:.2f} ms")
             break
         elif packet_command in ("help", "?"):
-            print("\t--s / --sr")
+            print(" --s / --sr")
         elif packet_command == "exit":
             break
         else:
             if attempts + 1 < 3:
-                print("\tError: Invalid command")
+                print(" Error: Invalid command")
             attempts += 1
 
     else:
-        print("\tError: Maximum attempts reached. Deleting packet...")
+        print(" Error: Maximum attempts reached. Deleting packet...")
 
 
 def main():
     while True:
-        translated_data = parse_cli()
-        create_packet(translated_data)
+        field_values = parse_cli()
+        if verify_field_values(field_values) is True:
+            packet = create_packet(field_values)
+            if packet:
+                command_packet(packet, field_values)
+        continue
 
 
 if __name__ == "__main__":
