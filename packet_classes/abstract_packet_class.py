@@ -4,6 +4,19 @@ VALID_PROTOCOLS = {"TCP", "ICMP", "UDP", "ARP"}
 
 
 class Packet:
+    """
+    A base class representing a generic network packet.
+
+    Attributes:
+        protocol (str): The protocol type (TCP, UDP, ICMP, or ARP).
+        dst_ip (str): The destination IP address.
+        num_pkts (int): Number of packets to send.
+
+    Methods:
+        get_protocol(): Returns the protocol type.
+        get_num_pkts(): Returns the number of packets to send.
+    """
+
     __slots__ = ["protocol", "dst_ip", "num_pkts"]
 
     def __init__(self, protocol: str = None, dst_ip: str = None, num_pkts: int = 1):

@@ -9,6 +9,20 @@ from field_validation import (
 
 
 class TCP_Packet(Packet):
+    """
+    Represents a TCP packet with customizable fields including IP addresses, ports,
+    MAC addresses, flags, and payloads. Inherits from the abstract base Packet class.
+
+    Attributes:
+        dst_port (int): The destination TCP port (required).
+        src_port (int, optional): The source TCP port.
+        src_ip (str, optional): Source IPv4 address.
+        dst_mac (str, optional): Destination MAC address.
+        src_mac (str, optional): Source MAC address.
+        flags (list[str] | str, optional): TCP flags (e.g., "S", "A", "FA").
+        payload (str, optional): Data payload for the TCP packet.
+    """
+
     __slots__ = [
         "dst_port",
         "src_port",
