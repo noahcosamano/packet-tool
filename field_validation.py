@@ -1,6 +1,9 @@
 """
-This program is the logical file for the main command line interface file.
-Please see "packet_crafter_CLI.py" for full program.
+This module provides input validation functions for IP addresses, MAC addresses,
+ports, protocols, TCP flags, ARP operation codes, payloads, and packet counts.
+
+These functions are used throughout the packet crafting application to ensure
+all user inputs meet expected formats and protocol rules.
 
 Author: Noah Cosamano
 """
@@ -14,6 +17,18 @@ VALID_PROTOCOLS = {"TCP", "ICMP", "UDP", "ARP"}
 
 
 def validate_ip(ip: str) -> str:
+    """
+    Validates an IPv4 address string.
+
+    Args:
+        ip (str): IP address to validate.
+
+    Returns:
+        str: The validated IP address.
+
+    Raises:
+        ValueError: If the IP address is invalid.
+    """
     try:
         ipaddress.IPv4Address(ip)
         return ip
@@ -24,6 +39,20 @@ def validate_ip(ip: str) -> str:
 def validate_mac(
     mac: str, protocol: str | None = None, arp_op: int | None = None
 ) -> str:
+    """
+    Validates a MAC address string.
+
+    Args:
+        mac (str): MAC address to validate.
+        protocol (str, optional): Protocol context ("arp", "tcp", etc.).
+        arp_op (int, optional): ARP operation (1 for request, 2 for reply).
+
+    Returns:
+        str: The validated MAC address.
+
+    Raises:
+        ValueError: If MAC is invalid or not allowed for given ARP op.
+    """
     if mac is not None and (protocol == "arp") and arp_op == 1:
         raise ValueError(" Error: ARP op #1 does not support destination MAC")
 
@@ -34,6 +63,19 @@ def validate_mac(
 
 
 def validate_port(port: int, protocol: str) -> int:
+    """
+    Validates a port number, ensuring it's allowed for the given protocol.
+
+    Args:
+        port (int): Port number to validate.
+        protocol (str): Associated protocol (e.g., "tcp", "udp").
+
+    Returns:
+        int: The validated port number.
+
+    Raises:
+        ValueError: If the port is invalid or not supported for the protocol.
+    """
     try:
         port = int(port)
     except Exception:
@@ -46,8 +88,21 @@ def validate_port(port: int, protocol: str) -> int:
 
 
 def validate_tcp_flags(flags: list | str | None, protocol: str) -> list[str] | None:
+    """
+    Validates TCP flags for a TCP packet.
+
+    Args:
+        flags (list|str|None): Flags to validate (e.g., "S" or ["S", "A"]).
+        protocol (str): Protocol context (must be "tcp").
+
+    Returns:
+        list[str]: List of lowercase TCP flags.
+
+    Raises:
+        ValueError: If flags are invalid or not allowed for non-TCP protocols.
+    """
     if flags is not None and protocol.lower() != "tcp":
-        raise ValueError(f" Error: Only TCP accepts flags")
+        raise ValueError(" Error: Only TCP accepts flags")
     if not isinstance(flags, (str, list)):
         raise ValueError(f" Error: Invalid TCP flag(s): {flags}")
     flag_list = list(flags) if isinstance(flags, str) else flags
@@ -58,12 +113,37 @@ def validate_tcp_flags(flags: list | str | None, protocol: str) -> list[str] | N
 
 
 def validate_protocol(protocol: str) -> str:
+    """
+    Validates a protocol name (TCP, ICMP, UDP, ARP).
+
+    Args:
+        protocol (str): Protocol name to validate.
+
+    Returns:
+        str: Lowercase version of the protocol.
+
+    Raises:
+        ValueError: If protocol is unsupported.
+    """
     if protocol.upper() not in VALID_PROTOCOLS:
         raise ValueError(" Error: Unsupported packet protocol")
     return protocol.lower()
 
 
 def validate_arp_op(arp_op: int | None, protocol: str) -> int | None:
+    """
+    Validates an ARP operation code (1 or 2).
+
+    Args:
+        arp_op (int|None): ARP operation code.
+        protocol (str): Protocol context (must be "arp").
+
+    Returns:
+        int: The validated ARP op code.
+
+    Raises:
+        ValueError: If protocol is not ARP or op code is invalid.
+    """
     if protocol == "arp":
         if int(arp_op) < 1 or int(arp_op) > 2:
             raise ValueError(" Error: ARP operator must be 1 or 2")
@@ -72,6 +152,18 @@ def validate_arp_op(arp_op: int | None, protocol: str) -> int | None:
 
 
 def validate_payload(payload) -> str | None:
+    """
+    Validates the payload field, ensuring it can be converted to a string.
+
+    Args:
+        payload (any): Payload to validate.
+
+    Returns:
+        str|None: Stringified payload or None.
+
+    Raises:
+        ValueError: If payload cannot be converted to a string.
+    """
     if payload:
         try:
             payload = str(payload)
@@ -82,6 +174,18 @@ def validate_payload(payload) -> str | None:
 
 
 def validate_num_pkts(num_pkts: int) -> int:
+    """
+    Validates the number of packets to send.
+
+    Args:
+        num_pkts (int): Number of packets (should be between 1 and 500).
+
+    Returns:
+        int: The validated number of packets.
+
+    Raises:
+        ValueError: If number is not an integer or out of range.
+    """
     try:
         num_pkts = int(num_pkts)
         if not 500 >= num_pkts >= 1:
