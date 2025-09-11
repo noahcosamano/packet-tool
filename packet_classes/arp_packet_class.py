@@ -1,4 +1,4 @@
-from abstract_packet_class import Packet
+from packet_classes.abstract_packet_class import Packet
 from field_validation import validate_ip, validate_mac, validate_arp_op
 
 

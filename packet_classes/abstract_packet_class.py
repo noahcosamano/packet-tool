@@ -15,3 +15,9 @@ class Packet:
         self.protocol = validate_protocol(protocol)
         self.dst_ip = validate_ip(dst_ip)
         self.num_pkts = validate_num_pkts(num_pkts)
+
+    def get_protocol(self):
+        return self.protocol
+
+    def get_num_pkts(self):
+        return self.num_pkts
