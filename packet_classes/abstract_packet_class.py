@@ -17,10 +17,6 @@ class Packet:
         dst_ipv4 (str): The destination IPv4 address.
         dst_ipv6 (str): The destination IPv6 address.
         num_pkts (int): Number of packets to send.
-
-    Methods:
-        get_protocol(): Returns the protocol type.
-        get_num_pkts(): Returns the number of packets to send.
     """
 
     __slots__ = ["protocol", "dst_ipv4", "dst_ipv6", "num_pkts"]
@@ -41,9 +37,3 @@ class Packet:
         self.dst_ipv4 = validate_ipv4(dst_ipv4) if dst_ipv4 else None
         self.dst_ipv6 = validate_ipv6(dst_ipv6) if dst_ipv6 else None
         self.num_pkts = validate_num_pkts(num_pkts)
-
-    def get_protocol(self):
-        return self.protocol
-
-    def get_num_pkts(self):
-        return self.num_pkts
