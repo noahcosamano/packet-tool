@@ -1,8 +1,8 @@
-from packet_classes.abstract_packetv4_class import Packetv4
-from field_validation import validate_ip, validate_mac, validate_arp_op
+from packet_classes.abstract_packet_class import Packet
+from field_validation import validate_ipv4, validate_mac, validate_arp_op
 
 
-class ARP_Packet(Packetv4):
+class ARP_Packet(Packet):
     """
     A class representing an ARP (Address Resolution Protocol) packet.
 
@@ -33,7 +33,7 @@ class ARP_Packet(Packetv4):
 
         super().__init__(protocol="arp", dst_ipv4=dst_ipv4, num_pkts=num_pkts)
 
-        self.src_ipv4 = validate_ip(src_ipv4) if src_ipv4 is not None else None
+        self.src_ipv4 = validate_ipv4(src_ipv4) if src_ipv4 is not None else None
         self.dst_mac = (
             validate_mac(dst_mac, protocol="arp") if dst_mac is not None else None
         )

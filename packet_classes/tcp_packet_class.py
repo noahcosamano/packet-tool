@@ -1,14 +1,15 @@
-from packet_classes.abstract_packetv4_class import Packetv4
+from packet_classes.abstract_packet_class import Packet
 from field_validation import (
     validate_port,
     validate_ipv4,
+    validate_ipv6,
     validate_mac,
     validate_tcp_flags,
     validate_payload,
 )
 
 
-class TCP_Packet(Packetv4):
+class TCP_Packet(Packet):
     """
     Represents a TCP packet with customizable fields including IPv4 addresses, ports,
     MAC addresses, flags, and payloads. Inherits from the abstract base Packet class.
@@ -17,6 +18,7 @@ class TCP_Packet(Packetv4):
         dst_port (int): The destination TCP port (required).
         src_port (int, optional): The source TCP port.
         src_ipv4 (str, optional): Source IPv4 address.
+        src_ipv6 (str, optional): Srouce IPv6 address.
         dst_mac (str, optional): Destination MAC address.
         src_mac (str, optional): Source MAC address.
         flags (list[str] | str, optional): TCP flags (e.g., "S", "A", "FA").
@@ -27,6 +29,7 @@ class TCP_Packet(Packetv4):
         "dst_port",
         "src_port",
         "src_ipv4",
+        "src_ipv6",
         "dst_mac",
         "src_mac",
         "flags",
@@ -36,9 +39,11 @@ class TCP_Packet(Packetv4):
     def __init__(
         self,
         dst_ipv4: str,
+        dst_ipv6: str,
         dst_port: int = None,
         src_port: int = None,
         src_ipv4: str = None,
+        src_ipv6: str = None,
         dst_mac: str = None,
         src_mac: str = None,
         flags: list[str] | str = None,
@@ -46,7 +51,9 @@ class TCP_Packet(Packetv4):
         num_pkts: int = 1,
     ):
 
-        super().__init__(protocol="tcp", dst_ipv4=dst_ipv4, num_pkts=num_pkts)
+        super().__init__(
+            protocol="tcp", dst_ipv4=dst_ipv4, dst_ipv6=dst_ipv6, num_pkts=num_pkts
+        )
 
         if dst_port is None:
             raise ValueError(" Error: Destination port is required for TCP protocol")
@@ -55,6 +62,7 @@ class TCP_Packet(Packetv4):
         self.src_port = validate_port(src_port, "tcp") if src_port is not None else None
 
         self.src_ipv4 = validate_ipv4(src_ipv4) if src_ipv4 is not None else None
+        self.src_ipv6 = validate_ipv6(src_ipv6) if src_ipv6 is not None else None
         self.dst_mac = (
             validate_mac(dst_mac, protocol="tcp") if dst_mac is not None else None
         )

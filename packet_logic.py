@@ -1,7 +1,8 @@
 import sqlite3
 import hashlib
 from datetime import datetime
-from scapy.layers.inet import TCP, IP, IPv6, UDP, ICMP
+from scapy.layers.inet import TCP, IP, UDP, ICMP
+from scapy.layers.inet6 import IPv6
 from scapy.layers.l2 import Ether, ARP
 from scapy.packet import Raw
 from scapy.sendrecv import send, sendp, sr1, srp1
@@ -32,33 +33,42 @@ def create_base_packet(field_values: dict):
     dst_ipv6 = field_values.get("dst_ipv6")
 
     dst_ip = dst_ipv4 if dst_ipv4 else dst_ipv6
-    is_ipv6 = dst_ipv6 is not None
 
     if not dst_ipv4 and not dst_ipv6:
-        raise ValueError("Error: Destination IPv4 or IPv6 address is required")
+        raise ValueError(" Error: Destination IPv4 or IPv6 address is required")
     if dst_ipv4 and dst_ipv6:
-        raise ValueError("Error: Only one of dst_ipv4 or dst_ipv6 should be provided")
+        raise ValueError(" Error: Only one IP address should be provided")
 
     if protocol == "tcp":
         if "dst_port" not in field_values:
             raise ValueError(" Error: Destination port is required for TCP")
-        return TCP_Packet(dst_ip, field_values["dst_port"], ipv6=is_ipv6)
+        return TCP_Packet(
+            dst_ipv4=field_values.get("dst_ipv4"),
+            dst_ipv6=field_values.get("dst_ipv6"),
+            dst_port=field_values["dst_port"],
+        )
 
     elif protocol == "udp":
         if "dst_port" not in field_values:
             raise ValueError(" Error: Destination port is required for UDP")
-        return UDP_Packet(dst_ip, field_values["dst_port"], ipv6=is_ipv6)
+        return UDP_Packet(
+            dst_ipv4=field_values.get("dst_ipv4"),
+            dst_ipv6=field_values.get("dst_ipv6"),
+            dst_port=field_values["dst_port"],
+        )
 
     elif protocol == "icmp":
-        return ICMP_Packet(dst_ip, ipv6=is_ipv6)
+        return ICMP_Packet(
+            dst_ipv4=field_values.get("dst_ipv4"), dst_ipv6=field_values.get("dst_ipv6")
+        )
 
     elif protocol == "arp":
         if dst_ipv6:
-            raise ValueError("Error: ARP does not support IPv6 addresses")
+            raise ValueError(" Error: ARP does not support IPv6 addresses")
         return ARP_Packet(dst_ip)
 
     else:
-        raise ValueError(f"Error: Unsupported protocol '{protocol}'")
+        raise ValueError(f" Error: Unsupported protocol '{protocol}'")
 
 
 def create_packet(field_values: dict):
@@ -165,7 +175,7 @@ def send_packet(packet, field_values: dict):
 
         print(f" {field_values.get("protocol").upper()} packet(s) sent successfully")
 
-        log_packet(packet, field_values)
+        log_packet(field_values)
 
 
 def send_receive_packet(packet, field_values: dict):
@@ -192,7 +202,6 @@ def send_receive_packet(packet, field_values: dict):
         )
 
         log_packet(
-            packet,
             field_values,
             response_summary=response.summary() if response else " No response",
         )
