@@ -1,7 +1,7 @@
 import sqlite3
 import hashlib
 from datetime import datetime
-from scapy.layers.inet import TCP, IP, UDP, ICMP
+from scapy.layers.inet import TCP, IP, IPv6, UDP, ICMP
 from scapy.layers.l2 import Ether, ARP
 from scapy.packet import Raw
 from scapy.sendrecv import send, sendp, sr1, srp1
@@ -24,33 +24,46 @@ def create_base_packet(field_values: dict):
     Returns:
         Packet object corresponding to the protocol (TCP_Packet, UDP_Packet, ICMP_Packet, or ARP_Packet).
     """
-    if "protocol" not in field_values:
-        raise ValueError(" Error: Protocol is required")
-    protocol = field_values["protocol"]
+    protocol = field_values.get("protocol")
+    if not protocol:
+        raise ValueError("Error: Protocol is required")
 
-    if "dst_ip" not in field_values:
-        raise ValueError(" Error: Destination IP is required")
-    dst_ip = field_values["dst_ip"]
+    dst_ipv4 = field_values.get("dst_ipv4")
+    dst_ipv6 = field_values.get("dst_ipv6")
+
+    dst_ip = dst_ipv4 if dst_ipv4 else dst_ipv6
+    is_ipv6 = dst_ipv6 is not None
+
+    if not dst_ipv4 and not dst_ipv6:
+        raise ValueError("Error: Destination IPv4 or IPv6 address is required")
+    if dst_ipv4 and dst_ipv6:
+        raise ValueError("Error: Only one of dst_ipv4 or dst_ipv6 should be provided")
 
     if protocol == "tcp":
         if "dst_port" not in field_values:
             raise ValueError(" Error: Destination port is required for TCP")
-        packet = TCP_Packet(dst_ip, field_values["dst_port"])
+        return TCP_Packet(dst_ip, field_values["dst_port"], ipv6=is_ipv6)
+
     elif protocol == "udp":
         if "dst_port" not in field_values:
             raise ValueError(" Error: Destination port is required for UDP")
-        packet = UDP_Packet(dst_ip, field_values["dst_port"])
-    elif protocol == "icmp":
-        packet = ICMP_Packet(dst_ip)
-    elif protocol == "arp":
-        packet = ARP_Packet(dst_ip)
+        return UDP_Packet(dst_ip, field_values["dst_port"], ipv6=is_ipv6)
 
-    return packet
+    elif protocol == "icmp":
+        return ICMP_Packet(dst_ip, ipv6=is_ipv6)
+
+    elif protocol == "arp":
+        if dst_ipv6:
+            raise ValueError("Error: ARP does not support IPv6 addresses")
+        return ARP_Packet(dst_ip)
+
+    else:
+        raise ValueError(f"Error: Unsupported protocol '{protocol}'")
 
 
 def create_packet(field_values: dict):
     """
-    Constructs a full packet including Ethernet, IP, Layer 4, and payload layers,
+    Constructs a full packet including Ethernet, IPv4, Layer 4, and payload layers,
     based on the provided field values.
 
     Args:
@@ -86,15 +99,22 @@ def create_packet(field_values: dict):
                 if field_values.get("dst_mac")
                 else "00:00:00:00:00:00"
             ),
-            psrc=field_values.get("src_ip"),
-            pdst=field_values.get("dst_ip"),
+            psrc=field_values.get("src_ipv4"),
+            pdst=field_values.get("dst_ipv4"),
         )
         packet = ether / arp if ether else arp
         return packet
 
-    ip = IP(dst=field_values["dst_ip"])
-    if field_values.get("src_ip"):
-        ip.src = field_values["src_ip"]
+    is_ipv6 = "dst_ipv6" in field_values
+    if is_ipv6:
+        ip = IPv6(dst=field_values["dst_ipv6"])
+        if field_values.get("src_ipv6"):
+            ip.src = field_values["src_ipv6"]
+
+    else:
+        ip = IP(dst=field_values["dst_ipv4"])
+        if field_values.get("src_ipv4"):
+            ip.src = field_values["src_ipv4"]
 
     if isinstance(packet, TCP_Packet):
         layer4 = TCP(dport=int(field_values.get("dst_port")))
@@ -207,8 +227,10 @@ def log_packet(field_values: dict, response_summary: str | None = None, anonymiz
         CREATE TABLE IF NOT EXISTS packet_history ( 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
-            dst_ip TEXT,
-            src_ip TEXT,
+            dst_ipv4 TEXT,
+            src_ipv4 TEXT,
+            dst_ipv6 TEXT,
+            src_ipv6 TEXT,
             dst_mac TEXT,
             src_mac TEXT,
             protocol TEXT,
@@ -222,15 +244,25 @@ def log_packet(field_values: dict, response_summary: str | None = None, anonymiz
     """
     )
 
-    dst_ip = (
-        hash_data(field_values.get("dst_ip"))
-        if (field_values.get("dst_ip") and anonymize)
-        else field_values.get("dst_ip")
+    dst_ipv4 = (
+        hash_data(field_values.get("dst_ipv4"))
+        if (field_values.get("dst_ipv4") and anonymize)
+        else field_values.get("dst_ipv4")
     )
-    src_ip = (
-        hash_data(field_values.get("src_ip"))
-        if (field_values.get("src_ip") and anonymize)
-        else field_values.get("src_ip")
+    src_ipv4 = (
+        hash_data(field_values.get("src_ipv4"))
+        if (field_values.get("src_ipv4") and anonymize)
+        else field_values.get("src_ipv4")
+    )
+    dst_ipv6 = (
+        hash_data(field_values.get("dst_ipv6"))
+        if (field_values.get("dst_ipv6") and anonymize)
+        else field_values.get("dst_ipv6")
+    )
+    src_ipv6 = (
+        hash_data(field_values.get("src_ipv6"))
+        if (field_values.get("src_ipv6") and anonymize)
+        else field_values.get("src_ipv6")
     )
     dst_mac = (
         hash_data(field_values.get("dst_mac"))
@@ -251,15 +283,17 @@ def log_packet(field_values: dict, response_summary: str | None = None, anonymiz
     c.execute(
         """
         INSERT INTO packet_history (
-            timestamp, dst_ip, src_ip, dst_mac, src_mac, protocol, 
+            timestamp, dst_ipv4, src_ipv4, dst_ipv6, src_ipv6, dst_mac, src_mac, protocol, 
             dst_port, src_port, flags, payload, arp_op, response
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
     """,
         (
             datetime.now().isoformat(),
-            dst_ip,
-            src_ip,
+            dst_ipv4,
+            src_ipv4,
+            dst_ipv6,
+            src_ipv6,
             dst_mac,
             src_mac,
             field_values.get("protocol"),

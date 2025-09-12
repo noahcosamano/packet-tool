@@ -1,5 +1,5 @@
 """
-This module provides input validation functions for IP addresses, MAC addresses,
+This module provides input validation functions for IPv4 addresses, MAC addresses,
 ports, protocols, TCP flags, ARP operation codes, payloads, and packet counts.
 
 These functions are used throughout the packet crafting application to ensure
@@ -16,24 +16,44 @@ VALID_TCP_FLAGS = {"f", "s", "r", "p", "a", "u"}
 VALID_PROTOCOLS = {"TCP", "ICMP", "UDP", "ARP"}
 
 
-def validate_ip(ip: str) -> str:
+def validate_ipv6(ipv6: str) -> str:
+    """
+    Validates an IPv6 address string.
+
+    Args:
+        ipv4 (str): IPv6 address to validate.
+
+    Returns:
+        str: The validated IPv6 address.
+
+    Raises:
+        ValueError: If the IPv6 address is invalid.
+    """
+    try:
+        ipaddress.IPv6Address(ipv6)
+        return ipv6
+    except ValueError:
+        raise ValueError(f" Error: Invalid IPv6 address: {ipv6}")
+
+
+def validate_ipv4(ipv4: str) -> str:
     """
     Validates an IPv4 address string.
 
     Args:
-        ip (str): IP address to validate.
+        ipv4 (str): IPv4 address to validate.
 
     Returns:
-        str: The validated IP address.
+        str: The validated IPv4 address.
 
     Raises:
-        ValueError: If the IP address is invalid.
+        ValueError: If the IPv4 address is invalid.
     """
     try:
-        ipaddress.IPv4Address(ip)
-        return ip
+        ipaddress.IPv4Address(ipv4)
+        return ipv4
     except ValueError:
-        raise ValueError(f" Error: Invalid IP address: {ip}")
+        raise ValueError(f" Error: Invalid IPv4 address: {ipv4}")
 
 
 def validate_mac(

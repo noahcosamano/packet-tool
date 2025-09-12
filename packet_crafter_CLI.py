@@ -21,8 +21,10 @@ from packet_logic import create_packet, send_packet, send_receive_packet
 
 COMMAND_TO_FIELD = {
     "-p": "protocol",
-    "-dip": "dst_ip",
-    "-sip": "src_ip",
+    "-dip4": "dst_ipv4",
+    "-sip4": "src_ipv4",
+    "-dip6": "dst_ipv6",
+    "-sip6": "src_ipv6",
     "-dp": "dst_port",
     "-sp": "src_port",
     "-dm": "dst_mac",
@@ -40,8 +42,10 @@ COMMAND_TO_USE = {
     "--sr": "Sends packet and waits for reply after packet has been created",
     "(command) ?": "Lists all options for command, (eg. -p ?)",
     "-p": "Protocol",
-    "-dip": "Destination IPv4",
-    "-sip": "Source IPv4",
+    "-dip4": "Destination IPv4",
+    "-sip4": "Source IPv4",
+    "-dip6": "Destination IPv6",
+    "-sip6": "Source IPv6",
     "-dp": "Destination port",
     "-sp": "Source port",
     "-dm": "Destination MAC",
@@ -85,8 +89,12 @@ def command_helper(command):
         case "-p":
             for protocol in VALID_PROTOCOLS:
                 print(f"  {protocol}")
-        case "-dip" | "-sip":
+        case "-dip4" | "-sip4":
             print(" x.x.x.x, x = 1-255, (eg. 192.168.52.3)")
+        case "-dip6" | "-sip6":
+            print(
+                " xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx, x = 0-9 a-F, (e.g. 2001:0db8:85a3:0000:0000:8a2e:0370:7334)"
+            )
         case "-dp" | "-sp":
             print(" 1-65535")
         case "-dm" | "-sm":
@@ -190,8 +198,10 @@ def verify_field_values(field_values: dict):
             match field.lower():
                 case "protocol":
                     continue
-                case "dst_ip" | "src_ip":
-                    validate_ip(value)
+                case "dst_ipv4" | "src_ipv4":
+                    validate_ipv4(value)
+                case "dst_ipv6" | "src_ipv6":
+                    validate_ipv6(value)
                 case "dst_mac" | "src_mac":
                     validate_mac(value, protocol)
                 case "flags":
