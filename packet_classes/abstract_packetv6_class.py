@@ -1,15 +1,15 @@
-from field_validation import validate_protocol, validate_num_pkts, validate_ip
+from field_validation import validate_protocol, validate_num_pkts, validate_ipv6
 
-VALID_PROTOCOLS = {"TCP", "ICMP", "UDP", "ARP"}
+VALID_PROTOCOLS = {"TCP", "ICMPv6", "UDP"}
 
 
-class Packet:
+class Packetv6:
     """
     A base class representing a generic network packet.
 
     Attributes:
-        protocol (str): The protocol type (TCP, UDP, ICMP, or ARP).
-        dst_ip (str): The destination IP address.
+        protocol (str): The protocol type (TCP, UDP, or ICMPv6).
+        dst_ipv6 (str): The destination IPv6 address.
         num_pkts (int): Number of packets to send.
 
     Methods:
@@ -17,16 +17,16 @@ class Packet:
         get_num_pkts(): Returns the number of packets to send.
     """
 
-    __slots__ = ["protocol", "dst_ip", "num_pkts"]
+    __slots__ = ["protocol", "dst_ipv4", "num_pkts"]
 
-    def __init__(self, protocol: str = None, dst_ip: str = None, num_pkts: int = 1):
+    def __init__(self, protocol: str = None, dst_ipv6: str = None, num_pkts: int = 1):
         if protocol is None:
             raise ValueError(" Error: Protocol required")
-        if dst_ip is None:
-            raise ValueError(" Error: Destination IP required")
+        if dst_ipv6 is None:
+            raise ValueError(" Error: Destination IPv6 required")
 
         self.protocol = validate_protocol(protocol)
-        self.dst_ip = validate_ip(dst_ip)
+        self.dst_ipv6 = validate_ipv6(dst_ipv6)
         self.num_pkts = validate_num_pkts(num_pkts)
 
     def get_protocol(self):
