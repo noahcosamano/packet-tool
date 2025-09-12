@@ -13,7 +13,7 @@ import re
 
 VALID_MAC = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 VALID_TCP_FLAGS = {"f", "s", "r", "p", "a", "u"}
-VALID_PROTOCOLS = {"TCP", "ICMP", "UDP", "ARP"}
+VALID_PROTOCOLS = {"TCP", "ICMP", "ICMPV6", "UDP", "ARP"}
 
 
 def validate_ipv6(ipv6: str) -> str:
@@ -100,7 +100,7 @@ def validate_port(port: int, protocol: str) -> int:
         port = int(port)
     except Exception:
         raise ValueError(f" Error: Invalid port: {port}")
-    if port is not None and (protocol.lower() in ("arp", "icmp")):
+    if port is not None and (protocol.lower() in ("arp", "icmp", "icmpv6")):
         raise ValueError(f" Error: {protocol.upper()} does not support ports")
     if not 1 <= port <= 65535:
         raise ValueError(f" Error: Invalid port: {port}")
@@ -122,7 +122,7 @@ def validate_tcp_flags(flags: list | str | None, protocol: str) -> list[str] | N
         ValueError: If flags are invalid or not allowed for non-TCP protocols.
     """
     if flags is not None and protocol.lower() != "tcp":
-        raise ValueError(" Error: Only TCP accepts flags")
+        raise ValueError(" Error: Only TCP supports flags")
     if not isinstance(flags, (str, list)):
         raise ValueError(f" Error: Invalid TCP flag(s): {flags}")
     flag_list = list(flags) if isinstance(flags, str) else flags

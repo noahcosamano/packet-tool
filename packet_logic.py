@@ -2,11 +2,12 @@ import sqlite3
 import hashlib
 from datetime import datetime
 from scapy.layers.inet import TCP, IP, UDP, ICMP
-from scapy.layers.inet6 import IPv6
+from scapy.layers.inet6 import IPv6, ICMPv6EchoRequest
 from scapy.layers.l2 import Ether, ARP
 from scapy.packet import Raw
 from scapy.sendrecv import send, sendp, sr1, srp1
 from packet_classes.icmp_packet_class import ICMP_Packet
+from packet_classes.icmpv6_packet_class import ICMPv6_Packet
 from packet_classes.arp_packet_class import ARP_Packet
 from packet_classes.tcp_packet_class import TCP_Packet
 from packet_classes.udp_packet_class import UDP_Packet
@@ -58,9 +59,14 @@ def create_base_packet(field_values: dict):
         )
 
     elif protocol == "icmp":
-        return ICMP_Packet(
-            dst_ipv4=field_values.get("dst_ipv4"), dst_ipv6=field_values.get("dst_ipv6")
-        )
+        if dst_ipv6:
+            raise ValueError(" Error: Only ICMPv6 supports IPv6 addresses")
+        return ICMP_Packet(dst_ipv4=field_values.get("dst_ipv4"))
+
+    elif protocol == "icmpv6":
+        if dst_ipv4:
+            raise ValueError(" Error: Only ICMP supports IPv4 addresses")
+        return ICMPv6_Packet(dst_ipv6=field_values.get("dst_ipv6"))
 
     elif protocol == "arp":
         if dst_ipv6:
@@ -141,6 +147,9 @@ def create_packet(field_values: dict):
     elif isinstance(packet, ICMP_Packet):
         layer4 = ICMP()
 
+    elif isinstance(packet, ICMPv6_Packet):
+        layer4 = ICMPv6EchoRequest()
+
     else:
         raise ValueError(" Error: Unsupported packet protocol")
 
@@ -148,10 +157,10 @@ def create_packet(field_values: dict):
     if payload:
         packet = packet / payload
     if ether:
-        if packet.dst_mac:
-            ether.dst = packet.dst_mac
-        if packet.src_mac:
-            ether.src = packet.src_mac
+        if field_values.get("dst_mac"):
+            ether.dst = field_values.get("dst_mac")
+        if field_values.get("src_mac"):
+            ether.src = field_values.get("src_mac")
         packet = ether / packet
 
     return packet
@@ -173,9 +182,9 @@ def send_packet(packet, field_values: dict):
         else:
             send(packet, verbose=0)
 
-        print(f" {field_values.get("protocol").upper()} packet(s) sent successfully")
-
         log_packet(field_values)
+
+    print(f" {field_values.get("protocol").upper()} packet(s) sent successfully")
 
 
 def send_receive_packet(packet, field_values: dict):

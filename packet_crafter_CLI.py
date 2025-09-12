@@ -90,7 +90,7 @@ def command_helper(command):
             for protocol in VALID_PROTOCOLS:
                 print(f"  {protocol}")
         case "-dip4" | "-sip4":
-            print(" x.x.x.x, x = 1-255, (eg. 192.168.52.3)")
+            print(" x.x.x.x, x = 0-255, (eg. 192.168.52.3)")
         case "-dip6" | "-sip6":
             print(
                 " xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx, x = 0-9 a-F, (e.g. 2001:0db8:85a3:0000:0000:8a2e:0370:7334)"
@@ -98,7 +98,7 @@ def command_helper(command):
         case "-dp" | "-sp":
             print(" 1-65535")
         case "-dm" | "-sm":
-            print(" x:x:x:x:x:x, x = 1-9 a-F, (eg. a5:6e:f0:b3:e8:98)")
+            print(" xx:xx:xx:xx:xx:xx, x = 1-9 a-F, (eg. a5:6e:f0:b3:e8:98)")
         case "-f":
             for flag in VALID_TCP_FLAGS:
                 print(f" {flag}")
